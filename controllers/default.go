@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"fmt"
+
 	beego "github.com/beego/beego/v2/server/web"
 )
 
@@ -26,5 +28,6 @@ func (c *MainController) sendResponse(body interface{}, statusCode int) {
 
 // @router / [get]
 func (c *MainController) Get() {
+	fmt.Println("--haha--")
 	c.sendResponse("hello perl", 0)
 }
