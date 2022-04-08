@@ -1,10 +1,25 @@
 package obsbuild
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 )
+
+type BDep struct {
+	Name       string
+	RepoArch   string
+	Project    string
+	Package    string
+	Srcmd5     string
+	NotMeta    bool
+	NotInstall bool
+}
+
+type RepoPath struct {
+	Server     string
+	Project    string
+	Repository string
+}
 
 type BuildInfo struct {
 	Project      string
@@ -18,6 +33,13 @@ type BuildInfo struct {
 
 	VerifyMd5 string
 	Srcmd5    string
+
+	SrcServer string
+
+	BDep    []BDep
+	SubPack []string
+
+	Path []RepoPath
 }
 
 func (b *BuildInfo) getkiwimode() string {
@@ -51,6 +73,10 @@ func (b *BuildInfo) isPTFMode() bool {
 	return b.File == "_ptf"
 }
 
+func (b *BuildInfo) isPreInstallImage() bool {
+	return b.File == "_preinstallimage"
+}
+
 func (b *BuildInfo) isFollowupMode() bool {
 	return b.FollowupFile != ""
 }
@@ -61,4 +87,54 @@ func (b *BuildInfo) getSrcmd5() string {
 	}
 
 	return b.Srcmd5
+}
+
+func (b *BuildInfo) getNotSrcBDep() (r []BDep) {
+	for _, item := range b.BDep {
+		if item.RepoArch != "src" {
+			r = append(r, item)
+		}
+	}
+
+	return
+}
+
+func (b *BuildInfo) getSrcBDep() (r []BDep) {
+	for _, item := range b.BDep {
+		if item.RepoArch == "src" {
+			r = append(r, item)
+		}
+	}
+
+	return
+}
+
+func (b *BuildInfo) getNotMetaBDep() (r []BDep) {
+	for _, item := range b.BDep {
+		if item.NotMeta && item.RepoArch != "src" {
+			r = append(r, item)
+		}
+	}
+
+	return
+}
+
+func (b *BuildInfo) getMetaBDep() (r []BDep) {
+	for _, item := range b.BDep {
+		if !item.NotMeta {
+			r = append(r, item)
+		}
+	}
+
+	return
+}
+
+func (b *BuildInfo) getNotInstallBDep() (r []BDep) {
+	for _, item := range b.BDep {
+		if item.NotInstall && item.RepoArch != "src" {
+			r = append(r, item)
+		}
+	}
+
+	return
 }

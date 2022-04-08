@@ -6,8 +6,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
+	"github.com/opensourceways/obs-worker/sdk/source"
+	"github.com/opensourceways/obs-worker/sdk/sslcert"
 	"github.com/opensourceways/obs-worker/utils"
 )
 
@@ -17,6 +20,8 @@ type options struct {
 
 	vmTmpfsMode    bool
 	vmDiskRootSize int
+
+	srcServer string
 }
 
 type buildEnv struct {
@@ -31,7 +36,11 @@ type buildOnce struct {
 	info *BuildInfo
 	env  buildEnv
 
+	hc utils.HttpClient
+
 	meta []string
+
+	srcServer string
 }
 
 func doBuild(opt options, info *BuildInfo) error {
@@ -61,6 +70,15 @@ func doBuild(opt options, info *BuildInfo) error {
 	cleanBuildEnv(env)
 
 	// download phase
+
+	v := opt.srcServer
+	if info.SrcServer != "" {
+		v = info.SrcServer
+	}
+
+	b := buildOnce{
+		srcServer: v,
+	}
 
 	return nil
 }
@@ -94,6 +112,8 @@ func (b *buildOnce) download(statedir string) error {
 		return b.downloadForDelta(statedir)
 	}
 
+	b.downloadForKiwiMode()
+
 	return nil
 }
 
@@ -112,10 +132,7 @@ func (b *buildOnce) downloadForDelta(statedir string) error {
 }
 
 func (b *buildOnce) downloadForKiwiMode(statedir string) ([]string, error) {
-	filename := filepath.Join(b.env.srcdir, b.info.File)
-
 	needsBinaries := false
-	needSSLCert := false
 	needAppxSSLCert := false
 	needOBSPackage := false
 
@@ -126,6 +143,10 @@ func (b *buildOnce) downloadForKiwiMode(statedir string) ([]string, error) {
 		re1 := regexp.MustCompile("^#\\s*needssslcertforbuild\\s*$|^Obs:\\s*needssslcertforbuild\\s*$")
 		re2 := regexp.MustCompile("^(?:#|Obs:)\\s*needsappxsslcertforbuild\\s*$")
 
+		needSSLCert := false
+
+		filename := filepath.Join(b.env.srcdir, b.info.File)
+
 		readFileLineByLine(filename, func(line string) bool {
 			b := []byte(line)
 			needsBinaries = re0.Match(b)
@@ -135,13 +156,119 @@ func (b *buildOnce) downloadForKiwiMode(statedir string) ([]string, error) {
 
 			return needsBinaries && needSSLCert && needAppxSSLCert && needOBSPackage
 		})
+
+		if needSSLCert {
+			if err := b.downloadSSLCert(); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil, nil
 }
 
+func (b *buildOnce) getSource() error {
+	info := b.info
+	v, err := b.downloadPkgSource(b.srcServer, info.Project, info.Package, info.Srcmd5, b.env.srcdir)
+	if err != nil {
+		return err
+	}
+
+	// verify sources
+	keys := make([]string, len(v))
+	m := make(map[string]string)
+	for i := range v {
+		item := &v[i]
+		m[item.Name] = item.MD5
+		keys[i] = item.Name
+	}
+	sort.Strings(keys)
+
+	md5s := make([]string, 0, len(v))
+	for _, k := range keys {
+		if f := filepath.Join(b.env.srcdir, k); !isFileExist(f) {
+			return fmt.Errorf("%s is not exist", f)
+		}
+
+		md5s = append(md5s, genMetaLine(m[k], k))
+	}
+
+	if md5 := utils.GenMD5([]byte(strings.Join(md5s, "\n"))); md5 != b.info.VerifyMd5 {
+		return fmt.Errorf("source verification fails, %s != %s", md5, b.info.VerifyMd5)
+	}
+
+	return nil
+}
+
+func (b *buildOnce) getBdeps() ([]string, error) {
+	if m := b.info.getkiwimode(); m != "image" && m != "product" {
+		return nil, nil
+	}
+
+	items := b.info.getSrcBDep()
+	meta := make([]string, len(items))
+	for i := range items {
+		item := &items[i]
+
+		saveTo := filepath.Join(b.env.srcdir, "images", item.Project, item.Package)
+		if err := os.MkdirAll(saveTo, os.FileMode(0777)); err != nil {
+			return nil, err
+		}
+
+		_, err := b.downloadPkgSource(b.srcServer, item.Project, item.Package, item.Srcmd5, saveTo)
+		if err != nil {
+			return nil, err
+		}
+
+		meta[i] = genMetaLine(item.Srcmd5, fmt.Sprintf("%s/%s", item.Project, item.Package))
+	}
+
+	return meta, nil
+}
+
+func (b *buildOnce) downloadPkgSource(srcServer, project, pkg, srcmd5, saveTo string) ([]source.CPIOFileMeta, error) {
+	opts := source.ListOpts{
+		Project: project,
+		Package: pkg,
+		Srcmd5:  srcmd5,
+	}
+
+	check := func(name string, h *source.CPIOFileHeader) (string, string, bool, error) {
+		return name, filepath.Join(saveTo, name), true, nil
+	}
+
+	return source.List(&b.hc, srcServer, &opts, check)
+}
+
+func (b *buildOnce) downloadSSLCert() error {
+	v, err := sslcert.List(&b.hc, b.srcServer, b.info.Project, true)
+	if err != nil {
+		return err
+	}
+
+	if v != "" {
+		return os.WriteFile(filepath.Join(b.env.srcdir, "_projectcert.crt"), []byte(v), 0644)
+	}
+
+	return nil
+}
+
 func genMetaLine(md5, pkg string) string {
 	return fmt.Sprintf("%s  %s", md5, pkg)
+}
+
+func splitMetaLine(line string) (string, string) {
+	v := strings.Split(line, "  ")
+	if len(v) == 2 {
+		return v[0], v[1]
+	}
+
+	return line, ""
+}
+
+func isFileExist(f string) bool {
+	_, err := os.Stat(f)
+	return err == nil
 }
 
 func isEmptyFile(f string) (bool, error) {
