@@ -1,4 +1,4 @@
-package source
+package filereceiver
 
 import (
 	"fmt"
@@ -28,6 +28,14 @@ type CPIOFileHeader struct {
 	Type     int
 	Pad      int
 	Namepad  int
+}
+
+// return 1. new name, 2. path to save file, 3. whether calc md5
+type CPIOPreCheck func(string, *CPIOFileHeader) (string, string, bool, error)
+
+func ReceiveCpioFiles(resp io.Reader, check CPIOPreCheck) ([]CPIOFileMeta, error) {
+	r := cpioReceiver{resp, check}
+	return r.do()
 }
 
 type cpioReceiver struct {

@@ -16,7 +16,7 @@ type HttpClient struct {
 	MaxRetries int
 }
 
-func (hc *HttpClient) ForwardTo(req *http.Request, handle func(io.Reader)) error {
+func (hc *HttpClient) ForwardTo(req *http.Request, handle func(http.Header, io.Reader) error) error {
 	resp, err := hc.do(req)
 	if err != nil || resp == nil {
 		return err
@@ -33,8 +33,9 @@ func (hc *HttpClient) ForwardTo(req *http.Request, handle func(io.Reader)) error
 	}
 
 	if handle != nil {
-		handle(resp.Body)
+		return handle(resp.Header, resp.Body)
 	}
+
 	return nil
 }
 
@@ -55,6 +56,44 @@ func (hc *HttpClient) do(req *http.Request) (resp *http.Response, err error) {
 		}
 	}
 	return
+}
+
+func ReadOnce(r io.Reader, part string, buf []byte, checkLen bool) (int, error) {
+	n, err := r.Read(buf)
+	if err != nil && n == 0 {
+		return n, fmt.Errorf("read %s, err: %v", part, err)
+	}
+
+	if checkLen && n != len(buf) {
+		return n, fmt.Errorf(
+			"encounter unexpect EOF for %s, expect to read %d bytes, but got %d",
+			part, len(buf), n,
+		)
+	}
+
+	return n, nil
+}
+
+func ReadData(r io.Reader, name string, total int64) ([]byte, error) {
+	last := total
+	buf := make([]byte, last)
+
+	var pn int64
+	var start int64
+	for start = 0; last > 0; start += pn {
+		pn = 8192
+		if last < pn {
+			pn = last
+		}
+		last -= pn
+
+		_, err := ReadOnce(r, name, buf[start:start+pn], true)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return buf, nil
 }
 
 func JsonMarshal(t interface{}) ([]byte, error) {
@@ -80,6 +119,19 @@ func GenQueryURI(endpoint string, params map[string]string) (string, error) {
 			q.Add(k, v)
 		}
 		v.RawQuery = q.Encode()
+	}
+
+	return v.String(), nil
+}
+
+func GenURL(endpoint, query string) (string, error) {
+	v, err := url.Parse(endpoint)
+	if err != nil {
+		return "", err
+	}
+
+	if query != "" {
+		v.RawQuery = query
 	}
 
 	return v.String(), nil

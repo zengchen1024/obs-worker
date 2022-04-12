@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/opensourceways/obs-worker/sdk/filereceiver"
 	"github.com/opensourceways/obs-worker/utils"
 )
 
@@ -25,10 +26,7 @@ func (l *ListOpts) toMap() (map[string]string, error) {
 	return v, err
 }
 
-// return 1. new name, 2. path to save file, 3. whether calc md5
-type CPIOPreCheck func(string, *CPIOFileHeader) (string, string, bool, error)
-
-func List(hc *utils.HttpClient, endpoint string, opts *ListOpts, check CPIOPreCheck) ([]CPIOFileMeta, error) {
+func List(hc *utils.HttpClient, endpoint string, opts *ListOpts, check filereceiver.CPIOPreCheck) (meta []filereceiver.CPIOFileMeta, err error) {
 	p, err := opts.toMap()
 	if err != nil {
 		return nil, err
@@ -44,16 +42,13 @@ func List(hc *utils.HttpClient, endpoint string, opts *ListOpts, check CPIOPreCh
 		return nil, err
 	}
 
-	var meta []CPIOFileMeta
-	var err1 error
-	handle := func(resp io.Reader) {
-		r := cpioReceiver{resp, check}
-		meta, err1 = r.do()
+	handle := func(h http.Header, resp io.Reader) error {
+		meta, err = filereceiver.ReceiveCpioFiles(resp, check)
+
+		return err
 	}
 
-	if err = hc.ForwardTo(req, handle); err != nil {
-		return nil, err
-	}
+	err = hc.ForwardTo(req, handle)
 
-	return meta, err1
+	return
 }

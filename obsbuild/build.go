@@ -22,6 +22,10 @@ type options struct {
 	vmDiskRootSize int
 
 	srcServer string
+	cacheDir  string
+	cacheSize int
+
+	workerId string
 }
 
 type buildEnv struct {
@@ -33,6 +37,7 @@ type buildEnv struct {
 }
 
 type buildOnce struct {
+	opts *options
 	info *BuildInfo
 	env  buildEnv
 
@@ -41,6 +46,17 @@ type buildOnce struct {
 	meta []string
 
 	srcServer string
+}
+
+func (b *buildOnce) getWorkerId() string {
+	return b.opts.workerId
+}
+func (b *buildOnce) getCacheDir() string {
+	return b.opts.cacheDir
+}
+
+func (b *buildOnce) getCacheSize() int {
+	return b.opts.cacheSize
 }
 
 func doBuild(opt options, info *BuildInfo) error {

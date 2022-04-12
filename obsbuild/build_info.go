@@ -34,12 +34,14 @@ type BuildInfo struct {
 	VerifyMd5 string
 	Srcmd5    string
 
-	SrcServer string
+	SrcServer  string
+	RepoServer string
 
 	BDep    []BDep
 	SubPack []string
 
-	Path []RepoPath
+	Path   []RepoPath
+	Module []string
 }
 
 func (b *BuildInfo) getkiwimode() string {
@@ -132,6 +134,16 @@ func (b *BuildInfo) getMetaBDep() (r []BDep) {
 func (b *BuildInfo) getNotInstallBDep() (r []BDep) {
 	for _, item := range b.BDep {
 		if item.NotInstall && item.RepoArch != "src" {
+			r = append(r, item)
+		}
+	}
+
+	return
+}
+
+func (b *BuildInfo) getAllNotInstallBDep() (r []BDep) {
+	for _, item := range b.BDep {
+		if item.NotInstall {
 			r = append(r, item)
 		}
 	}
