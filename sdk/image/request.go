@@ -6,9 +6,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 
+	"github.com/opensourceways/obs-worker/sdk/filereceiver"
 	"github.com/opensourceways/obs-worker/utils"
 )
 
@@ -79,17 +79,7 @@ func Download(hc *utils.HttpClient, endpoint, prpa, path, saveTo string) error {
 	}
 
 	handle := func(h http.Header, r io.Reader) error {
-		n, err := strconv.Atoi(h.Get("content-length"))
-		if err != nil {
-			return err
-		}
-
-		b, err := utils.ReadData(r, "", int64(n))
-		if err != nil {
-			return err
-		}
-
-		return os.WriteFile(saveTo, b, os.FileMode(0644))
+		return filereceiver.ReceiveFile(h, r, saveTo)
 	}
 
 	return hc.ForwardTo(req, handle)

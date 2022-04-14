@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/opensourceways/obs-worker/sdk/config"
+	"github.com/opensourceways/obs-worker/sdk/filereceiver"
 	"github.com/opensourceways/obs-worker/sdk/source"
 	"github.com/opensourceways/obs-worker/sdk/sslcert"
 	"github.com/opensourceways/obs-worker/utils"
@@ -44,8 +46,6 @@ type buildOnce struct {
 	hc utils.HttpClient
 
 	meta []string
-
-	srcServer string
 }
 
 func (b *buildOnce) getWorkerId() string {
@@ -57,6 +57,18 @@ func (b *buildOnce) getCacheDir() string {
 
 func (b *buildOnce) getCacheSize() int {
 	return b.opts.cacheSize
+}
+
+func (b *buildOnce) getSrcServer() string {
+	if b.info.SrcServer != "" {
+		return b.info.SrcServer
+	}
+
+	return b.opts.srcServer
+}
+
+func (b *buildOnce) getBuildRoot() string {
+	return b.opts.buildroot
 }
 
 func doBuild(opt options, info *BuildInfo) error {
@@ -86,15 +98,6 @@ func doBuild(opt options, info *BuildInfo) error {
 	cleanBuildEnv(env)
 
 	// download phase
-
-	v := opt.srcServer
-	if info.SrcServer != "" {
-		v = info.SrcServer
-	}
-
-	b := buildOnce{
-		srcServer: v,
-	}
 
 	return nil
 }
@@ -128,7 +131,7 @@ func (b *buildOnce) download(statedir string) error {
 		return b.downloadForDelta(statedir)
 	}
 
-	b.downloadForKiwiMode()
+	b.downloadForKiwiMode("")
 
 	return nil
 }
@@ -175,7 +178,7 @@ func (b *buildOnce) downloadForKiwiMode(statedir string) ([]string, error) {
 
 		if needSSLCert {
 			if err := b.downloadSSLCert(); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
@@ -185,7 +188,7 @@ func (b *buildOnce) downloadForKiwiMode(statedir string) ([]string, error) {
 
 func (b *buildOnce) getSource() error {
 	info := b.info
-	v, err := b.downloadPkgSource(b.srcServer, info.Project, info.Package, info.Srcmd5, b.env.srcdir)
+	v, err := b.downloadPkgSource(b.getSrcServer(), info.Project, info.Package, info.Srcmd5, b.env.srcdir)
 	if err != nil {
 		return err
 	}
@@ -231,7 +234,7 @@ func (b *buildOnce) getBdeps() ([]string, error) {
 			return nil, err
 		}
 
-		_, err := b.downloadPkgSource(b.srcServer, item.Project, item.Package, item.Srcmd5, saveTo)
+		_, err := b.downloadPkgSource(b.getSrcServer(), item.Project, item.Package, item.Srcmd5, saveTo)
 		if err != nil {
 			return nil, err
 		}
@@ -242,14 +245,18 @@ func (b *buildOnce) getBdeps() ([]string, error) {
 	return meta, nil
 }
 
-func (b *buildOnce) downloadPkgSource(srcServer, project, pkg, srcmd5, saveTo string) ([]source.CPIOFileMeta, error) {
+func (b *buildOnce) downloadPkgSource(srcServer, project, pkg, srcmd5, saveTo string) (
+	[]filereceiver.CPIOFileMeta, error,
+) {
 	opts := source.ListOpts{
 		Project: project,
 		Package: pkg,
 		Srcmd5:  srcmd5,
 	}
 
-	check := func(name string, h *source.CPIOFileHeader) (string, string, bool, error) {
+	check := func(name string, h *filereceiver.CPIOFileHeader) (
+		string, string, bool, error,
+	) {
 		return name, filepath.Join(saveTo, name), true, nil
 	}
 
@@ -257,7 +264,7 @@ func (b *buildOnce) downloadPkgSource(srcServer, project, pkg, srcmd5, saveTo st
 }
 
 func (b *buildOnce) downloadSSLCert() error {
-	v, err := sslcert.List(&b.hc, b.srcServer, b.info.Project, true)
+	v, err := sslcert.List(&b.hc, b.getSrcServer(), b.info.Project, true)
 	if err != nil {
 		return err
 	}
@@ -267,6 +274,18 @@ func (b *buildOnce) downloadSSLCert() error {
 	}
 
 	return nil
+}
+
+func (b *buildOnce) downloadConfig() error {
+	return config.Download(
+		&b.hc,
+		b.getSrcServer(),
+		&config.DownloadOpts{
+			b.info.Project,
+			b.info.Repository,
+		},
+		filepath.Join(b.getBuildRoot(), ".build.config"),
+	)
 }
 
 func genMetaLine(md5, pkg string) string {
