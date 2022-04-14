@@ -18,6 +18,18 @@ func isBinFile(name string) (string, string, bool) {
 	return "", "", false
 }
 
+func isMetaFile(name string) (string, bool) {
+	if s := ".meta"; strings.HasSuffix(name, s) {
+		return strings.TrimSuffix(name, s), true
+	}
+
+	return "", false
+}
+
+func queryHdrmd5(file string) string {
+	return ""
+}
+
 func linkOrCopy(src, dst string) (err error) {
 	os.Remove(dst)
 

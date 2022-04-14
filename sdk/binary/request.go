@@ -13,34 +13,30 @@ import (
 	"github.com/opensourceways/obs-worker/utils"
 )
 
-type ListOpts struct {
-	Project    string   `json:"project,omitempty"`
-	Repository string   `json:"repository,omitempty"`
-	Arch       string   `json:"arch,omitempty"`
-	NoMeta     bool     `json:"-"`
-	Binaries   []string `json:"-"`
+type CommonOpts struct {
+	WorkerId   string   `json:"workerid,omitempty"`
+	Project    string   `json:"project" required:"true"`
+	Repository string   `json:"repository" required:"true"`
+	Arch       string   `json:"arch" required:"true"`
 	Modules    []string `json:"-"`
+	Binaries   []string `json:"-"`
 }
 
-func (o *ListOpts) toQuery() (string, error) {
+func (o *CommonOpts) values() (url.Values, error) {
 	b, err := json.Marshal(o)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	v := make(map[string]string)
 	err = json.Unmarshal(b, &v)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	q := make(url.Values)
 	for k, item := range v {
 		q.Add(k, item)
-	}
-
-	if o.NoMeta {
-		q.Add("nometa", "1")
 	}
 
 	if len(o.Binaries) > 0 {
@@ -49,6 +45,25 @@ func (o *ListOpts) toQuery() (string, error) {
 
 	for _, m := range o.Modules {
 		q.Add("module", m)
+	}
+
+	return q, nil
+}
+
+type ListOpts struct {
+	CommonOpts
+
+	NoMeta bool `json:"-"`
+}
+
+func (o *ListOpts) toQuery() (string, error) {
+	q, err := o.values()
+	if err != nil {
+		return "", err
+	}
+
+	if o.NoMeta {
+		q.Add("nometa", "1")
 	}
 
 	return q.Encode(), nil
@@ -92,34 +107,19 @@ func List(hc *utils.HttpClient, endpoint string, opts *ListOpts) (binaries Binar
 }
 
 type DownloadOpts struct {
-	WorkerId   string   `json:"workerid,omitempty"`
-	Project    string   `json:"project" required:"true"`
-	Repository string   `json:"repository" required:"true"`
-	Arch       string   `json:"arch" required:"true"`
-	Binaries   []string `json:"-"`
+	CommonOpts
+
+	MetaOnly bool `json:"-"`
 }
 
 func (o *DownloadOpts) toQuery() (string, error) {
-	b, err := json.Marshal(o)
+	q, err := o.values()
 	if err != nil {
 		return "", err
 	}
 
-	v := make(map[string]string)
-	err = json.Unmarshal(b, &v)
-	if err != nil {
-		return "", err
-	}
-
-	q := make(url.Values)
-	for k, item := range v {
-		q.Add(k, item)
-	}
-
-	q.Add("metaonly", "1")
-
-	if len(o.Binaries) > 0 {
-		q.Add("binaries", strings.Join(o.Binaries, ","))
+	if o.MetaOnly {
+		q.Add("metaonly", "1")
 	}
 
 	return q.Encode(), nil

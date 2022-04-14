@@ -17,6 +17,14 @@ func genPrpa(proj, repo, arch string) string {
 	return fmt.Sprintf("%s/%s/%s", proj, repo, arch)
 }
 
+func pasePrps(s string) (string, string, string) {
+	if v := strings.Split(s, "/"); len(v) == 3 {
+		return v[0], v[1], v[2]
+	}
+
+	return s, "", ""
+}
+
 func genCacheId(prpa, hdrmd5 string) string {
 	return utils.GenMD5([]byte(fmt.Sprintf("%s/%s", prpa, hdrmd5)))
 }
@@ -25,7 +33,67 @@ func genCacheFile(cacheDir, cacheId string) string {
 	return filepath.Join(cacheDir, cacheId[0:2], cacheId)
 }
 
-func (b *buildOnce) getPreinstallImage(bins []string) {
+func getImageFile(img *image.Image) string {
+	return "preinstallimage." + img.File
+}
+
+type preInstallImage struct {
+	hdrmd5s map[string]string
+
+	img image.Image
+
+	imagesWithMeta sets.String
+	imageOrigins   map[string]string
+}
+
+func (p *preInstallImage) isEmpty() bool {
+	return p.img.File == ""
+}
+
+func (p *preInstallImage) getImageName() string {
+	return getImageFile(&p.img)
+}
+
+func (p *preInstallImage) getImageBins() (map[string]string, sets.String, map[string]string) {
+	knownHdrmd5s := sets.NewString(p.img.HdrMD5s...)
+
+	metas := sets.NewString()
+	bins := make(map[string]string)
+	imageToPrpa := make(map[string]string)
+	for k, v := range p.hdrmd5s {
+		if knownHdrmd5s.Has(v) {
+			bins[k] = v
+
+			if p.imagesWithMeta.Has(k) {
+				metas.Insert(k)
+			}
+
+			if v1, ok := p.imageOrigins[k]; ok {
+				imageToPrpa[k] = v1
+			}
+		}
+	}
+
+	return bins, metas, imageToPrpa
+}
+
+func (p *preInstallImage) getImageSource() string {
+	prpa := p.img.Prpa
+
+	// strip arch
+	s := prpa
+	if i := strings.LastIndex(prpa, "/"); i > 0 {
+		s = prpa[:i]
+	}
+
+	if p.img.Package != "" {
+		s = fmt.Sprintf("%s/%s", s, p.img.Package)
+	}
+
+	return fmt.Sprintf("%s %s", s, p.img.HdrMD5)
+}
+
+func (b *buildOnce) getPreInstallImage(bins []string) (pre preInstallImage) {
 	info := b.info
 
 	prpas := make(map[string][]string)
@@ -101,7 +169,15 @@ func (b *buildOnce) getPreinstallImage(bins []string) {
 	}
 
 	img := helper.chooseBestImage(imageList, hdrmd5s, metas)
+	pre.img = *img.img
 
+	imagesWithMeta := sets.NewString()
+	for k := range metas {
+		imagesWithMeta.Insert(k)
+	}
+	pre.imagesWithMeta = imagesWithMeta
+
+	return
 }
 
 type preinstallImageHelper struct {
@@ -280,7 +356,7 @@ func (h *preinstallImageHelper) isImageInCache(img *imageInfo) bool {
 		return false
 	}
 
-	ifile := img.getImageFile(h.b.env.pkgdir)
+	ifile := img.getImageFilePath(h.b.env.pkgdir)
 	os.Remove(ifile)
 
 	if nil != linkOrCopy(cacheFile, ifile) {
@@ -314,7 +390,7 @@ func (h *preinstallImageHelper) downloadImage(img *imageInfo) bool {
 		h.b.manageCache(h.b.opts.cacheSize-(n<<10), nil, nil)
 	}
 
-	ifile := img.getImageFile(h.getPkgDir())
+	ifile := img.getImageFilePath(h.getPkgDir())
 	os.Remove(ifile)
 
 	err := image.Download(&h.b.hc, img.loadFrom, img.img.Prpa, img.img.Path, ifile)
@@ -433,11 +509,10 @@ func (h *preinstallImageHelper) downloadImageMeta(
 	done := sets.NewString()
 	for i := range res {
 		name := res[i].Name
-		if !strings.HasSuffix(name, ".meta") {
+		bin, ok := isMetaFile(name)
+		if !ok {
 			continue
 		}
-
-		bin := strings.TrimSuffix(name, ".meta")
 
 		bv, ok := metas[bin]
 		if !ok {
@@ -489,6 +564,6 @@ func (b *imageInfo) genCacheMeta() string {
 	return genMetaLine(b.img.HdrMD5, ":preinstallimage")
 }
 
-func (b *imageInfo) getImageFile(dir string) string {
-	return filepath.Join(dir, "preinstallimage"+b.img.File)
+func (b *imageInfo) getImageFilePath(dir string) string {
+	return filepath.Join(dir, getImageFile(b.img))
 }

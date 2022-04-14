@@ -7,34 +7,119 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/opensourceways/obs-worker/sdk/binary"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-func (b *buildOnce) getBinaries() error {
-	if err := os.Mkdir(b.env.pkgdir, os.FileMode(0777)); err != nil {
-		return err
+func (b *buildOnce) getBinaries(dir string) ([]string, error) {
+	if err := os.Mkdir(dir, os.FileMode(0777)); err != nil {
+		return nil, err
 	}
 
-	info := b.info
-
-	v := info.getNotSrcBDep()
-	if len(v) == 0 {
-		return fmt.Errorf("no binaries needed for this package")
-	}
-
-	bdep := make([]string, len(v))
-	for i := range v {
-		bdep[i] = v[i].Name
-	}
-
-	return nil
+	h := binaryOfNonKiwiHelper{b, dir}
+	return h.getBinaries()
 }
 
-type downloadBinary struct {
+type binaryOfNonKiwiHelper struct {
 	b *buildOnce
+
+	dir string
 }
 
-func (d *downloadBinary) genMetaForNonKiwi() ([]string, error) {
+func (h *binaryOfNonKiwiHelper) getBinaries() ([]string, error) {
+	v := h.b.info.getNotSrcBDep()
+	if len(v) == 0 {
+		return nil, fmt.Errorf("no binaries needed for this package")
+	}
+
+	todo := sets.NewString()
+	for i := range v {
+		todo.Insert(v[i].Name)
+	}
+
+	var imagesWithMeta sets.String
+	var imageBins map[string]string
+
+	img := h.b.getPreInstallImage(todo.UnsortedList())
+	if !img.isEmpty() {
+		imageBins, imagesWithMeta, _ = img.getImageBins()
+
+		for k := range todo {
+			if _, ok := imageBins[k]; ok {
+				todo.Delete(k)
+			}
+		}
+	}
+
+	done, metas := h.getBinaryCache(todo, nil)
+	imagesWithMeta = imagesWithMeta.Union(metas)
+
+	if todo.Len() > 0 {
+		return nil, fmt.Errorf("missing packages: %s", strings.Join(todo.UnsortedList(), ", "))
+	}
+
+	return h.genMetaData(done, imageBins)
+}
+
+func (h *binaryOfNonKiwiHelper) getBinaryCache(
+	bins sets.String,
+	knownBinaries map[string][]binary.Binary,
+) (map[string]string, sets.String) {
+	done := make(map[string]string)
+	imagesWithMeta := sets.NewString()
+
+	info := h.b.info
+	for _, repo := range info.Path {
+		if bins.Len() == 0 {
+			break
+		}
+
+		server := repo.Server
+		if server == "" {
+			server = info.RepoServer
+		}
+
+		nometa := repo.Project != info.Project ||
+			repo.Repository != info.Repository ||
+			info.isPreInstallImage()
+
+		ch := binaryCacheHelper{
+			b:          h.b,
+			dir:        h.dir,
+			knowns:     knownBinaries[genPrpa(repo.Project, repo.Repository, info.Arch)],
+			repoServer: server,
+			info: &binary.ListOpts{
+				CommonOpts: binary.CommonOpts{
+					WorkerId:   h.b.getWorkerId(),
+					Project:    repo.Project,
+					Repository: repo.Repository,
+					Arch:       info.Arch,
+					Modules:    info.Module,
+					Binaries:   bins.UnsortedList(),
+				},
+				NoMeta: nometa,
+			},
+		}
+
+		got, err := ch.get()
+		if err != nil {
+
+		}
+
+		for k, v := range got {
+			done[k] = v.name
+			if !nometa && v.hasMeta {
+				imagesWithMeta.Insert(k)
+			}
+
+			bins.Delete(k)
+		}
+	}
+
+	return done, imagesWithMeta
+}
+
+func (d *binaryOfNonKiwiHelper) genMetaData(done, imageBins map[string]string) ([]string, error) {
 	subpacks := d.wrapsSubPacks()
 
 	info := d.b.info
@@ -51,7 +136,14 @@ func (d *downloadBinary) genMetaForNonKiwi() ([]string, error) {
 	for _, bdep := range bdeps {
 		f := filepath.Join(d.b.env.pkgdir, bdep+".meta")
 		if b, err := isEmptyFile(f); b || err != nil {
+			v := imageBins[bdep]
+			if v == "" {
+				if v = queryHdrmd5(filepath.Join(d.dir, done[bdep])); v == "" {
+					v = "deaddeaddeaddeaddeaddeaddeaddead"
+				}
+			}
 
+			meta = append(meta, v)
 		} else {
 			m := d.parseMetaFile(bdep, f, info.Package, subpacks)
 			meta = append(meta, m...)
@@ -61,7 +153,7 @@ func (d *downloadBinary) genMetaForNonKiwi() ([]string, error) {
 	return d.genMeta(meta, 0), nil
 }
 
-func (d *downloadBinary) parseMetaFile(dep, file, currentPkg string, subpacks sets.String) []string {
+func (d *binaryOfNonKiwiHelper) parseMetaFile(dep, file, currentPkg string, subpacks sets.String) []string {
 	meta := []string{}
 	firstLine := true
 	seen := sets.NewString()
@@ -102,7 +194,7 @@ func (d *downloadBinary) parseMetaFile(dep, file, currentPkg string, subpacks se
 	return meta
 }
 
-func (d *downloadBinary) wrapsSubPacks() sets.String {
+func (d *binaryOfNonKiwiHelper) wrapsSubPacks() sets.String {
 	info := d.b.info
 
 	v := sets.NewString()
@@ -131,7 +223,7 @@ func wrapsEachPkg(pkgPath string, full bool) []string {
 	return a
 }
 
-func (d *downloadBinary) genMeta(deps []string, algorithm int) []string {
+func (d *binaryOfNonKiwiHelper) genMeta(deps []string, algorithm int) []string {
 	subpacks := d.wrapsSubPacks()
 
 	subpackPath := sets.NewString()

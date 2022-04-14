@@ -12,7 +12,7 @@ type BinaryVersionList struct {
 type Binary struct {
 	XMLName    xml.Name `xml:"binary"`
 	Name       string   `xml:"name,attr"`
-	SizeK      string   `xml:"sizek,attr"`
+	SizeK      int      `xml:"sizek,attr"`
 	HdrMD5     string   `xml:"hdrmd5,attr"`
 	Error      string   `xml:"error,attr"`
 	MetaMD5    string   `xml:"metamd5,attr"`
