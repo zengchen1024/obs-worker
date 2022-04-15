@@ -1,7 +1,6 @@
 package obsbuild
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,7 +26,8 @@ type options struct {
 	cacheDir  string
 	cacheSize int
 
-	workerId string
+	workerId  string
+	localKiwi string
 }
 
 type buildEnv struct {
@@ -123,7 +123,7 @@ func cleanDir(dir string) {
 }
 
 func (b *buildOnce) download(statedir string) error {
-	if err := os.Mkdir(b.env.srcdir, os.FileMode(0777)); err != nil {
+	if err := mkdir(b.env.srcdir); err != nil {
 		return err
 	}
 
@@ -230,7 +230,7 @@ func (b *buildOnce) getBdeps() ([]string, error) {
 		item := &items[i]
 
 		saveTo := filepath.Join(b.env.srcdir, "images", item.Project, item.Package)
-		if err := os.MkdirAll(saveTo, os.FileMode(0777)); err != nil {
+		if err := mkdirAll(saveTo); err != nil {
 			return nil, err
 		}
 
@@ -270,7 +270,7 @@ func (b *buildOnce) downloadSSLCert() error {
 	}
 
 	if v != "" {
-		return os.WriteFile(filepath.Join(b.env.srcdir, "_projectcert.crt"), []byte(v), 0644)
+		return writeFile(filepath.Join(b.env.srcdir, "_projectcert.crt"), []byte(v))
 	}
 
 	return nil
@@ -288,53 +288,107 @@ func (b *buildOnce) downloadConfig() error {
 	)
 }
 
-func genMetaLine(md5, pkg string) string {
-	return fmt.Sprintf("%s  %s", md5, pkg)
-}
+func (b *buildOnce) genRpmList(pre *preInstallImage) error {
+	pkgdir := b.env.pkgdir
+	kiwiMode := b.info.getkiwimode()
+	imageBins, _, _ := pre.getImageBins()
 
-func splitMetaLine(line string) (string, string) {
-	v := strings.Split(line, "  ")
-	if len(v) == 2 {
-		return v[0], v[1]
-	}
+	rpmList := []string{}
 
-	return line, ""
-}
+	bdeps := b.info.BDep
+	for i := range bdeps {
+		bdep := &bdeps[i]
 
-func isFileExist(f string) bool {
-	_, err := os.Stat(f)
-	return err == nil
-}
-
-func isEmptyFile(f string) (bool, error) {
-	v, err := os.Stat(f)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return true, nil
+		if bdep.Package != "" || bdep.RepoArch == "src" {
+			continue
 		}
 
-		return false, err
-	}
+		if kiwiMode != "" && bdep.NoInstall {
+			continue
+		}
 
-	if v.IsDir() {
-		return false, fmt.Errorf("%s is a directory", f)
-	}
+		bin := bdep.Name
 
-	return v.Size() == 0, nil
-}
+		if imageBins[bin] != "" {
+			rpmList = append(rpmList, fmt.Sprintf("%s preinstallimage", bin))
+			continue
+		}
 
-func readFileLineByLine(filename string, handle func(string) bool) {
-	f, err := os.Open(filename)
-	if err != nil {
-		return
-	}
-	defer f.Close()
+		for j, suf := range knownBins {
+			if f := filepath.Join(pkgdir, bin+suf); isFileExist(f) {
+				rpmList = append(rpmList, fmt.Sprintf("%s %s", bin, f))
+				break
+			}
 
-	scanner := bufio.NewScanner(f)
-
-	for scanner.Scan() {
-		if b := handle(scanner.Text()); b {
-			break
+			if j == len(knownBins)-1 {
+				return fmt.Errorf("missing package: %s", bin)
+			}
 		}
 	}
+
+	if s := pre.getImageName(); s != "" {
+		rpmList = append(
+			rpmList,
+			fmt.Sprintf("preinstallimage: %s", filepath.Join(pkgdir, s)),
+		)
+	}
+
+	if s := pre.getImageSource(); s != "" {
+		rpmList = append(
+			rpmList,
+			fmt.Sprintf("preinstallimagesource: %s", s),
+		)
+	}
+
+	if s := b.opts.localKiwi; s != "" {
+		if f := filepath.Join(s, s+".rpm"); isFileExist(f) {
+			rpmList = append(rpmList, fmt.Sprintf("%s %s", s, f))
+		}
+	}
+
+	add := func(item string, ok func(*BDep) bool) {
+		names := make([]string, 0, len(bdeps))
+
+		for i := range bdeps {
+			if bdep := &bdeps[i]; ok(bdep) {
+				names = append(names, bdep.Name)
+			}
+		}
+
+		if len(names) > 0 {
+			rpmList = append(
+				rpmList,
+				fmt.Sprintf("%s: %s", item, strings.Join(names, " ")),
+			)
+		}
+	}
+
+	add("preinstall", func(v *BDep) bool {
+		return v.PreInstall
+	})
+
+	add("vminstall", func(v *BDep) bool {
+		return v.VMInstall
+	})
+
+	add("runscripts", func(v *BDep) bool {
+		return v.RunScripts
+	})
+
+	if kiwiMode != "" {
+		add("noinstall", func(v *BDep) bool {
+			return v.NoInstall
+		})
+
+		add("installonly", func(v *BDep) bool {
+			return v.InstallOnly
+		})
+	}
+
+	writeFile(
+		filepath.Join(b.getBuildRoot(), ".build.rpmlist"),
+		[]byte(strings.Join(append(rpmList, "\n"), "\n")),
+	)
+
+	return nil
 }

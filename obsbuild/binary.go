@@ -2,7 +2,6 @@ package obsbuild
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -12,7 +11,7 @@ import (
 )
 
 func (b *buildOnce) getBinaries(dir string) ([]string, error) {
-	if err := os.Mkdir(dir, os.FileMode(0777)); err != nil {
+	if err := mkdir(dir); err != nil {
 		return nil, err
 	}
 

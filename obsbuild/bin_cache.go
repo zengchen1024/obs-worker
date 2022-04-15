@@ -56,7 +56,7 @@ func (h *cacheManager) addNewCache(caches []binCache) ([]binCacheInfo, error) {
 
 		// copy bin File
 		cacheFile := c.getCacheFile(cacheDir)
-		os.MkdirAll(filepath.Dir(cacheFile), os.FileMode(0777))
+		mkdirAll(filepath.Dir(cacheFile))
 
 		tmp := cacheFile + ".$$"
 

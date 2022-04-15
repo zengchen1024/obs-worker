@@ -408,7 +408,7 @@ func (h *preinstallImageHelper) downloadImage(img *imageInfo) bool {
 	// manage_cache
 	data := img.genCacheMeta()
 	tmp := ifile + ".meta"
-	if nil == os.WriteFile(tmp, []byte(data), 0644) {
+	if nil == writeFile(tmp, []byte(data)) {
 		h.b.manageCache(
 			h.b.getCacheSize(), nil,
 			[]binCache{

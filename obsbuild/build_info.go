@@ -6,13 +6,17 @@ import (
 )
 
 type BDep struct {
-	Name       string
-	RepoArch   string
-	Project    string
-	Package    string
-	Srcmd5     string
-	NotMeta    bool
-	NotInstall bool
+	Name        string
+	RepoArch    string
+	Project     string
+	Package     string
+	Srcmd5      string
+	NotMeta     bool
+	NoInstall   bool
+	PreInstall  bool
+	VMInstall   bool
+	RunScripts  bool
+	InstallOnly bool
 }
 
 type RepoPath struct {
@@ -133,7 +137,7 @@ func (b *BuildInfo) getMetaBDep() (r []BDep) {
 
 func (b *BuildInfo) getNotInstallBDep() (r []BDep) {
 	for _, item := range b.BDep {
-		if item.NotInstall && item.RepoArch != "src" {
+		if item.NoInstall && item.RepoArch != "src" {
 			r = append(r, item)
 		}
 	}
@@ -143,7 +147,7 @@ func (b *BuildInfo) getNotInstallBDep() (r []BDep) {
 
 func (b *BuildInfo) getAllNotInstallBDep() (r []BDep) {
 	for _, item := range b.BDep {
-		if item.NotInstall {
+		if item.NoInstall {
 			r = append(r, item)
 		}
 	}

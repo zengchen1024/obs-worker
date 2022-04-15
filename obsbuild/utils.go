@@ -1,6 +1,8 @@
 package obsbuild
 
 import (
+	"bufio"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -65,4 +67,67 @@ func linkOrCopy(src, dst string) (err error) {
 	err = out.Sync()
 
 	return
+}
+
+func genMetaLine(md5, pkg string) string {
+	return fmt.Sprintf("%s  %s", md5, pkg)
+}
+
+func splitMetaLine(line string) (string, string) {
+	v := strings.Split(line, "  ")
+	if len(v) == 2 {
+		return v[0], v[1]
+	}
+
+	return line, ""
+}
+
+func isFileExist(f string) bool {
+	_, err := os.Stat(f)
+	return err == nil
+}
+
+func isEmptyFile(f string) (bool, error) {
+	v, err := os.Stat(f)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return true, nil
+		}
+
+		return false, err
+	}
+
+	if v.IsDir() {
+		return false, fmt.Errorf("%s is a directory", f)
+	}
+
+	return v.Size() == 0, nil
+}
+
+func readFileLineByLine(filename string, handle func(string) bool) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+
+	for scanner.Scan() {
+		if b := handle(scanner.Text()); b {
+			break
+		}
+	}
+}
+
+func writeFile(f string, data []byte) error {
+	return os.WriteFile(f, data, 0644)
+}
+
+func mkdir(dir string) error {
+	return os.Mkdir(dir, os.FileMode(0777))
+}
+
+func mkdirAll(dir string) error {
+	return os.MkdirAll(dir, os.FileMode(0777))
 }
