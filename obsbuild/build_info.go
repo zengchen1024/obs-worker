@@ -46,6 +46,9 @@ type BuildInfo struct {
 
 	Path   []RepoPath
 	Module []string
+
+	Release   string
+	DebugInfo string
 }
 
 func (b *BuildInfo) getkiwimode() string {

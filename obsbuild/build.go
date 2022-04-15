@@ -19,8 +19,7 @@ type options struct {
 	buildroot string
 	statedir  string
 
-	vmTmpfsMode    bool
-	vmDiskRootSize int
+	vmTmpfsMode bool
 
 	srcServer string
 	cacheDir  string
@@ -28,6 +27,40 @@ type options struct {
 
 	workerId  string
 	localKiwi string
+
+	vmType             string
+	vmRoot             string
+	vmSwap             string
+	emulatorScript     string
+	vmEnableConsole    bool
+	vmWorkerInstance   int
+	vmWorkerName       string
+	hugetlbfs          string
+	vmDiskClean        bool
+	vmDiskMountOptions string
+	vmDiskFileSystem   string
+	vmDiskSwapSize     int
+	vmDiskRootSize     int
+	vmCustomOption     string
+	vmInitrd           string
+	vmKernel           string
+	vmMemory           int
+
+	openstackServer string
+	openstackFlavor string
+
+	jobs    int
+	threads int
+}
+
+func (o *options) setdefault() {
+	if o.vmRoot == "" {
+		o.vmRoot = o.buildroot + ".img"
+	}
+
+	if o.vmSwap == "" {
+		o.vmSwap = o.buildroot + ".swap"
+	}
 }
 
 type buildEnv struct {
@@ -36,6 +69,10 @@ type buildEnv struct {
 	oldpkgdir string
 	meta      string
 	packages  string
+	mountDir  string
+	config    string
+	rpmList   string
+	logFile   string
 }
 
 type buildOnce struct {
@@ -46,6 +83,8 @@ type buildOnce struct {
 	hc utils.HttpClient
 
 	meta []string
+
+	exe utils.Executor
 }
 
 func (b *buildOnce) getWorkerId() string {
@@ -80,6 +119,10 @@ func doBuild(opt options, info *BuildInfo) error {
 		oldpkgdir: filepath.Join(buildroot, ".build.oldpackages"),
 		meta:      filepath.Join(buildroot, ".build.meta"),
 		packages:  filepath.Join(buildroot, ".build.packages"),
+		mountDir:  filepath.Join(buildroot, ".mount"),
+		config:    filepath.Join(buildroot, ".build.config"),
+		rpmList:   filepath.Join(buildroot, ".build.rpmlist"),
+		logFile:   filepath.Join(buildroot, ".build.log"),
 	}
 
 	var exe utils.Executor
@@ -284,7 +327,7 @@ func (b *buildOnce) downloadConfig() error {
 			b.info.Project,
 			b.info.Repository,
 		},
-		filepath.Join(b.getBuildRoot(), ".build.config"),
+		b.env.config,
 	)
 }
 
@@ -386,7 +429,7 @@ func (b *buildOnce) genRpmList(pre *preInstallImage) error {
 	}
 
 	writeFile(
-		filepath.Join(b.getBuildRoot(), ".build.rpmlist"),
+		b.env.rpmList,
 		[]byte(strings.Join(append(rpmList, "\n"), "\n")),
 	)
 
