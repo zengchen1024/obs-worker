@@ -88,6 +88,20 @@ type buildOnce struct {
 	exe utils.Executor
 
 	stats statistic.BuildStatistics
+
+	kiwiOrigins map[string][]string
+}
+
+func (b *buildOnce) setKiwiOrigin(k, v string) {
+	if items, ok := b.kiwiOrigins[k]; ok {
+		b.kiwiOrigins[k] = append(items, v)
+	} else {
+		b.kiwiOrigins[k] = []string{v}
+	}
+}
+
+func (b *buildOnce) getKiwiOrigin(k string) []string {
+	return b.kiwiOrigins[k]
 }
 
 func (b *buildOnce) getWorkerId() string {

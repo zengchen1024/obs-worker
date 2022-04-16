@@ -49,6 +49,10 @@ type BuildInfo struct {
 
 	Release   string
 	DebugInfo string
+
+	BuildTime int
+	BuildHost string
+	DistURL   string
 }
 
 func (b *BuildInfo) getkiwimode() string {

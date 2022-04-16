@@ -82,10 +82,12 @@ func (h *binaryOfNonKiwiHelper) getBinaryCache(
 			repo.Repository != info.Repository ||
 			info.isPreInstallImage()
 
+		prpa := genPrpa(repo.Project, repo.Repository, info.Arch)
+
 		ch := binaryCacheHelper{
 			b:          h.b,
 			dir:        h.dir,
-			knowns:     knownBinaries[genPrpa(repo.Project, repo.Repository, info.Arch)],
+			knowns:     knownBinaries[prpa],
 			repoServer: server,
 			info: &binary.ListOpts{
 				CommonOpts: binary.CommonOpts{
@@ -112,6 +114,8 @@ func (h *binaryOfNonKiwiHelper) getBinaryCache(
 			}
 
 			bins.Delete(k)
+
+			h.b.setKiwiOrigin(k, prpa)
 		}
 	}
 

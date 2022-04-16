@@ -104,10 +104,10 @@ func isEmptyFile(f string) (bool, error) {
 	return v.Size() == 0, nil
 }
 
-func readFileLineByLine(filename string, handle func(string) bool) {
+func readFileLineByLine(filename string, handle func(string) bool) error {
 	f, err := os.Open(filename)
 	if err != nil {
-		return
+		return err
 	}
 	defer f.Close()
 
@@ -118,6 +118,8 @@ func readFileLineByLine(filename string, handle func(string) bool) {
 			break
 		}
 	}
+
+	return nil
 }
 
 func writeFile(f string, data []byte) error {
