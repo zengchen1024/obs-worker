@@ -12,6 +12,7 @@ import (
 	"github.com/opensourceways/obs-worker/sdk/filereceiver"
 	"github.com/opensourceways/obs-worker/sdk/source"
 	"github.com/opensourceways/obs-worker/sdk/sslcert"
+	"github.com/opensourceways/obs-worker/sdk/statistic"
 	"github.com/opensourceways/obs-worker/utils"
 )
 
@@ -85,6 +86,8 @@ type buildOnce struct {
 	meta []string
 
 	exe utils.Executor
+
+	stats statistic.BuildStatistics
 }
 
 func (b *buildOnce) getWorkerId() string {

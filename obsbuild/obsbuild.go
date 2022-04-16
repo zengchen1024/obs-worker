@@ -6,7 +6,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/opensourceways/obs-worker/sdk/statistic"
 )
+
+const knownVMs = "xen kvm zvm emulator pvm"
 
 func (b *buildOnce) getObsBuildArgs() []string {
 	h := obsbuildHelper{b}
@@ -15,6 +19,10 @@ func (b *buildOnce) getObsBuildArgs() []string {
 
 type obsbuildHelper struct {
 	b *buildOnce
+}
+
+func (h *obsbuildHelper) getVMType() string {
+	return h.b.opts.vmType
 }
 
 func (h *obsbuildHelper) genArgs() []string {
@@ -26,9 +34,9 @@ func (h *obsbuildHelper) genArgs() []string {
 		args = append(args, v...)
 	}
 
-	vm := h.b.opts.vmType
+	vm := h.getVMType()
 
-	if strings.Contains("xen kvm zvm emulator pvm", vm) {
+	if strings.Contains(knownVMs, vm) {
 		h.genArgsForVM(vm, add)
 	} else if vm == "openstack" {
 		h.genArgsForOpenstack(add)
@@ -211,4 +219,102 @@ func (h *obsbuildHelper) genArgsForKiwiImage(add func(...string)) {
 	if info.getkiwimode() != "image" {
 		return
 	}
+}
+
+func (h *obsbuildHelper) postAction() {
+	h.postActionForVMWorker()
+
+	other := filepath.Join(h.b.env.packages, "OTHER")
+	if !isFileExist(other) {
+		mkdir(other)
+	}
+
+	if b, err := statistic.Mashal(&h.b.stats); err == nil {
+		tmp := filepath.Join(other, "_statistics.new")
+		if nil == writeFile(tmp, b) {
+			os.Rename(tmp, strings.TrimSuffix(tmp, ".new"))
+		}
+	}
+
+	// write buildinfo->{'outbuildinfo'} to xml
+
+}
+
+func (h *obsbuildHelper) postActionForVMWorker() {
+	vm := h.getVMType()
+	if !strings.Contains(knownVMs, vm) && vm != "openstack" {
+		return
+	}
+
+	env := h.b.env
+
+	pkgDir := env.packages
+	os.RemoveAll(pkgDir)
+
+	// move directory with extracted build results
+	s := filepath.Join(env.mountDir, ".build.packages")
+	if err := os.Rename(s, pkgDir); err != nil {
+		return
+	}
+
+	s = "."
+	os.Symlink(s, filepath.Join(pkgDir, "SRPMS"))
+	os.Symlink(s, filepath.Join(pkgDir, "DEBS"))
+	os.Symlink(s, filepath.Join(pkgDir, "KIWI"))
+
+	h.convertStatToXml()
+}
+
+// convert build statistics into xml
+func (h *obsbuildHelper) convertStatToXml() {
+	s := filepath.Join(h.b.env.pkgdir, "OTHER", "_statistics")
+	if !isFileExist(s) {
+		return
+	}
+
+	stats := &h.b.stats
+
+	setTimes := func(key string, v int) {
+		t := statistic.Time{Unit: "s", Value: v}
+		switch key {
+		case "TIME_preinstall":
+			stats.Times.Preinstall = t
+		case "TIME_install":
+			stats.Times.Install = t
+		case "TIME_main_build":
+			stats.Times.Main = t
+		case "TIME_postchecks":
+			stats.Times.Postchecks = t
+		case "TIME_rpmlint":
+			stats.Times.Rpmlint = t
+		case "TIME_buildcmp":
+			stats.Times.Buildcmp = t
+		case "TIME_deltarpms":
+			stats.Times.Deltarpms = t
+		}
+	}
+
+	readFileLineByLine(s, func(l string) bool {
+		items := strings.Split(l, ": ")
+		v, _ := strconv.Atoi(items[1])
+
+		switch items[0] {
+		case "MAX_mb_used_on_disk":
+			stats.Disk.Usage.Size = statistic.Size{Unit: "M", Value: v}
+
+		case "MAX_mb_used_memory":
+			stats.Memory.Usage = statistic.Size{Unit: "M", Value: v}
+
+		case "IO_requests_read", "IO_requests_write":
+			stats.Disk.Usage.IORequests += v
+
+		case "IO_sectors_read", "IO_sectors_write":
+			stats.Disk.Usage.IOSectors += v
+
+		default:
+			setTimes(items[0], v)
+		}
+
+		return false
+	})
 }
