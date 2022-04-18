@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/opensourceways/obs-worker/utils"
+	"github.com/zengchen1024/obs-worker/utils"
 )
 
 type binCache struct {

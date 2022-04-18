@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/opensourceways/obs-worker/utils"
+	"github.com/zengchen1024/obs-worker/utils"
 )
 
 type CPIOFileMeta struct {

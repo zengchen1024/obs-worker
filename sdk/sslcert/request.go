@@ -4,7 +4,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/opensourceways/obs-worker/utils"
+	"github.com/zengchen1024/obs-worker/utils"
 )
 
 func List(hc *utils.HttpClient, endpoint, project string, autoExtend bool) (string, error) {

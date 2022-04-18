@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/opensourceways/obs-worker/sdk/filereceiver"
-	"github.com/opensourceways/obs-worker/utils"
+	"github.com/zengchen1024/obs-worker/sdk/filereceiver"
+	"github.com/zengchen1024/obs-worker/utils"
 )
 
 type DownloadOpts struct {

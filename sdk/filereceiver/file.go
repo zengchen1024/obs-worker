@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/opensourceways/obs-worker/utils"
+	"github.com/zengchen1024/obs-worker/utils"
 )
 
 func ReceiveFile(h http.Header, r io.Reader, saveTo string) error {

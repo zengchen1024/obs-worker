@@ -1,4 +1,4 @@
-module github.com/opensourceways/obs-worker
+module github.com/zengchen1024/obs-worker
 
 go 1.16
 

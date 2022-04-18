@@ -8,12 +8,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/opensourceways/obs-worker/sdk/config"
-	"github.com/opensourceways/obs-worker/sdk/filereceiver"
-	"github.com/opensourceways/obs-worker/sdk/source"
-	"github.com/opensourceways/obs-worker/sdk/sslcert"
-	"github.com/opensourceways/obs-worker/sdk/statistic"
-	"github.com/opensourceways/obs-worker/utils"
+	"github.com/zengchen1024/obs-worker/sdk/config"
+	"github.com/zengchen1024/obs-worker/sdk/filereceiver"
+	"github.com/zengchen1024/obs-worker/sdk/source"
+	"github.com/zengchen1024/obs-worker/sdk/sslcert"
+	"github.com/zengchen1024/obs-worker/sdk/statistic"
+	"github.com/zengchen1024/obs-worker/utils"
 )
 
 type options struct {

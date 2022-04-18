@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/opensourceways/obs-worker/sdk/binary"
+	"github.com/zengchen1024/obs-worker/sdk/binary"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 

@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/opensourceways/obs-worker/sdk/binary"
-	"github.com/opensourceways/obs-worker/utils"
+	"github.com/zengchen1024/obs-worker/sdk/binary"
+	"github.com/zengchen1024/obs-worker/utils"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 

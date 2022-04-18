@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/opensourceways/obs-worker/sdk/report"
+	"github.com/zengchen1024/obs-worker/sdk/report"
 )
 
 type reportHelper struct {

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/opensourceways/obs-worker/sdk/statistic"
+	"github.com/zengchen1024/obs-worker/sdk/statistic"
 )
 
 const knownVMs = "xen kvm zvm emulator pvm"
