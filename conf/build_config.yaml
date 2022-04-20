@@ -1,0 +1,12 @@
+build:
+  hard_status: true
+  build_root: /var/cache/obs/worker/root_10
+  state_dir: /srv/obs/run/worker/3
+  id: host-172-16-1-171:10
+  repo_servers:
+  - http://localhost:5252
+  src_server: http://localhost:5352
+  host_label:
+  - OBS_WORKER_SECURITY_LEVEL_
+  cache_dir: /var/cache/obs/worker/cache
+  cache_size: 503705

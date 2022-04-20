@@ -27,13 +27,15 @@ func List(hc *utils.HttpClient, endpoint, project string, autoExtend bool) (stri
 
 	var cert string
 	var err1 error
-	handle := func(resp io.Reader) {
+	handle := func(header http.Header, resp io.Reader) error {
 		v, err := io.ReadAll(resp)
 		if err != nil {
 			err1 = err
 		} else {
 			cert = string(v)
 		}
+
+		return nil
 	}
 
 	if err = hc.ForwardTo(req, handle); err != nil {

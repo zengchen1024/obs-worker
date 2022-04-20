@@ -13,6 +13,7 @@ import (
 	"github.com/zengchen1024/obs-worker/sdk/source"
 	"github.com/zengchen1024/obs-worker/sdk/sslcert"
 	"github.com/zengchen1024/obs-worker/sdk/statistic"
+	"github.com/zengchen1024/obs-worker/sdk/worker"
 	"github.com/zengchen1024/obs-worker/utils"
 )
 
@@ -85,11 +86,38 @@ type buildOnce struct {
 
 	meta []string
 
-	exe utils.Executor
-
+	state worker.Worker
 	stats statistic.BuildStatistics
 
 	kiwiOrigins map[string][]string
+
+	cfg  *Config
+	port int
+}
+
+var instance *buildOnce
+
+func Init(cfg *Config, port int) error {
+	b := buildOnce{
+		cfg:  cfg,
+		port: port,
+	}
+
+	if err := b.getWorkerInfo(); err != nil {
+		return err
+	}
+
+	b.sendIdleState()
+
+	instance = &b
+
+	return nil
+}
+
+func Exit() {
+	if instance != nil {
+		instance.sendExitState()
+	}
 }
 
 func (b *buildOnce) setKiwiOrigin(k, v string) {
@@ -142,16 +170,14 @@ func doBuild(opt options, info *BuildInfo) error {
 		logFile:   filepath.Join(buildroot, ".build.log"),
 	}
 
-	var exe utils.Executor
-
 	if opt.vmTmpfsMode {
-		out, err := exe.Run(
+		out, err := utils.RunCmd(
 			"mount", "-t", "tmpfs",
 			fmt.Sprintf("-osize=%dM", opt.vmDiskRootSize),
 			"none", buildroot,
 		)
 		if err != nil {
-			return fmt.Errorf("%v %v", err, string(out))
+			return fmt.Errorf("%v %s", err, out)
 		}
 	}
 

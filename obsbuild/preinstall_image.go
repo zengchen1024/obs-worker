@@ -193,12 +193,14 @@ func (h *preinstallImageHelper) getBinary(repo *RepoPath, bins []string) (binary
 	}
 
 	opts := binary.ListOpts{
-		Project:    repo.Project,
-		Repository: repo.Repository,
-		Arch:       info.Arch,
-		Modules:    info.Module,
-		Binaries:   bins,
-		NoMeta:     h.isRepoNoMeta(repo),
+		CommonOpts: binary.CommonOpts{
+			Project:    repo.Project,
+			Repository: repo.Repository,
+			Arch:       info.Arch,
+			Modules:    info.Module,
+			Binaries:   bins,
+		},
+		NoMeta: h.isRepoNoMeta(repo),
 	}
 
 	v, err := binary.List(&h.b.hc, endpoint, &opts)
@@ -482,11 +484,13 @@ func (h *preinstallImageHelper) downloadImageMeta(
 ) bool {
 	info := h.b.info
 	opts := binary.DownloadOpts{
-		WorkerId:   h.b.getWorkerId(),
-		Project:    info.Project,
-		Repository: info.Repository,
-		Arch:       info.Arch,
-		Binaries:   todo.UnsortedList(),
+		CommonOpts: binary.CommonOpts{
+			WorkerId:   h.b.getWorkerId(),
+			Project:    info.Project,
+			Repository: info.Repository,
+			Arch:       info.Arch,
+			Binaries:   todo.UnsortedList(),
+		},
 	}
 
 	endpoint := info.RepoServer

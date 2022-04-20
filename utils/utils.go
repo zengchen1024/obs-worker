@@ -4,6 +4,8 @@ import (
 	"crypto/md5"
 	"fmt"
 	"os"
+
+	"github.com/beego/beego/v2/core/logs"
 )
 
 func GenMD5(b []byte) string {
@@ -17,4 +19,12 @@ func GenMd5OfFile(f string) (string, error) {
 	}
 
 	return GenMD5(v), nil
+}
+
+func LogInfo(f string, v ...interface{}) {
+	logs.Info(fmt.Sprintf(f, v...))
+}
+
+func LogErr(f string, v ...interface{}) {
+	logs.Error(fmt.Sprintf(f, v...))
 }
