@@ -3,57 +3,12 @@ package obsbuild
 import (
 	"regexp"
 	"strings"
+
+	"github.com/zengchen1024/obs-worker/sdk/buildinfo"
 )
 
-type BDep struct {
-	Name        string
-	RepoArch    string
-	Project     string
-	Package     string
-	Srcmd5      string
-	NotMeta     bool
-	NoInstall   bool
-	PreInstall  bool
-	VMInstall   bool
-	RunScripts  bool
-	InstallOnly bool
-}
-
-type RepoPath struct {
-	Server     string
-	Project    string
-	Repository string
-}
-
-type BuildInfo struct {
-	Project      string
-	Package      string
-	Repository   string
-	Arch         string
-	HostArch     string
-	File         string
-	ImageType    []string
-	FollowupFile string
-
-	VerifyMd5 string
-	Srcmd5    string
-
-	SrcServer  string
-	RepoServer string
-
-	BDep    []BDep
-	SubPack []string
-
-	Path   []RepoPath
-	Module []string
-
-	Release   string
-	DebugInfo string
-
-	BuildTime int
-	BuildHost string
-	DistURL   string
-}
+type BDep = buildinfo.BDep
+type BuildInfo buildinfo.BuildInfo
 
 func (b *BuildInfo) getkiwimode() string {
 	re := regexp.MustCompile("^_service:.*:")
@@ -99,11 +54,11 @@ func (b *BuildInfo) getSrcmd5() string {
 		return b.VerifyMd5
 	}
 
-	return b.Srcmd5
+	return b.SrcMd5
 }
 
 func (b *BuildInfo) getNotSrcBDep() (r []BDep) {
-	for _, item := range b.BDep {
+	for _, item := range b.BDeps {
 		if item.RepoArch != "src" {
 			r = append(r, item)
 		}
@@ -113,7 +68,7 @@ func (b *BuildInfo) getNotSrcBDep() (r []BDep) {
 }
 
 func (b *BuildInfo) getSrcBDep() (r []BDep) {
-	for _, item := range b.BDep {
+	for _, item := range b.BDeps {
 		if item.RepoArch == "src" {
 			r = append(r, item)
 		}
@@ -123,8 +78,8 @@ func (b *BuildInfo) getSrcBDep() (r []BDep) {
 }
 
 func (b *BuildInfo) getNotMetaBDep() (r []BDep) {
-	for _, item := range b.BDep {
-		if item.NotMeta && item.RepoArch != "src" {
+	for _, item := range b.BDeps {
+		if buildinfo.IsTrue(item.NotMeta) && item.RepoArch != "src" {
 			r = append(r, item)
 		}
 	}
@@ -133,8 +88,8 @@ func (b *BuildInfo) getNotMetaBDep() (r []BDep) {
 }
 
 func (b *BuildInfo) getMetaBDep() (r []BDep) {
-	for _, item := range b.BDep {
-		if !item.NotMeta {
+	for _, item := range b.BDeps {
+		if !buildinfo.IsTrue(item.NotMeta) {
 			r = append(r, item)
 		}
 	}
@@ -143,8 +98,8 @@ func (b *BuildInfo) getMetaBDep() (r []BDep) {
 }
 
 func (b *BuildInfo) getNotInstallBDep() (r []BDep) {
-	for _, item := range b.BDep {
-		if item.NoInstall && item.RepoArch != "src" {
+	for _, item := range b.BDeps {
+		if buildinfo.IsTrue(item.NoInstall) && item.RepoArch != "src" {
 			r = append(r, item)
 		}
 	}
@@ -153,8 +108,8 @@ func (b *BuildInfo) getNotInstallBDep() (r []BDep) {
 }
 
 func (b *BuildInfo) getAllNotInstallBDep() (r []BDep) {
-	for _, item := range b.BDep {
-		if item.NoInstall {
+	for _, item := range b.BDeps {
+		if buildinfo.IsTrue(item.NoInstall) {
 			r = append(r, item)
 		}
 	}
