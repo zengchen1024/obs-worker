@@ -10,9 +10,9 @@ import (
 	"github.com/opensourceways/community-robot-lib/interrupts"
 
 	"github.com/zengchen1024/obs-worker/config"
-	"github.com/zengchen1024/obs-worker/obsbuild"
 	_ "github.com/zengchen1024/obs-worker/routers"
 	"github.com/zengchen1024/obs-worker/utils"
+	"github.com/zengchen1024/obs-worker/worker"
 )
 
 func main() {
@@ -34,12 +34,12 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := obsbuild.Init(&cfg.Build, port); err != nil {
+	if err := worker.Init(&cfg.Build, port); err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	defer obsbuild.Exit()
+	defer worker.Exit()
 
 	run()
 }

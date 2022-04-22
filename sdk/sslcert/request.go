@@ -7,7 +7,9 @@ import (
 	"github.com/zengchen1024/obs-worker/utils"
 )
 
-func List(hc *utils.HttpClient, endpoint, project string, autoExtend bool) (string, error) {
+func List(hc *utils.HttpClient, endpoint, project string, autoExtend bool) (
+	cert []byte, err error,
+) {
 	p := map[string]string{
 		"project": project,
 	}
@@ -17,30 +19,20 @@ func List(hc *utils.HttpClient, endpoint, project string, autoExtend bool) (stri
 
 	url, err := utils.GenQueryURI(endpoint+"/getsslcert", p)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	var cert string
-	var err1 error
 	handle := func(header http.Header, resp io.Reader) error {
-		v, err := io.ReadAll(resp)
-		if err != nil {
-			err1 = err
-		} else {
-			cert = string(v)
-		}
-
-		return nil
+		cert, err = io.ReadAll(resp)
+		return err
 	}
 
-	if err = hc.ForwardTo(req, handle); err != nil {
-		return "", err
-	}
+	err = hc.ForwardTo(req, handle)
 
-	return cert, err1
+	return
 }

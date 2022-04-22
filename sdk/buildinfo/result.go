@@ -38,7 +38,7 @@ type BuildInfo struct {
 	ImageType []string `xml:"imagetype"`
 	Modules   []string `xml:"module"`
 	BDeps     []BDep   `xml:"bdep"`
-	Pathes    []Path   `xml:"path"`
+	Paths     []Path   `xml:"path"`
 
 	FollowupFile string `xml:"followupfile"`
 }
