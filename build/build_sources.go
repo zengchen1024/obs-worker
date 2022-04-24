@@ -55,7 +55,7 @@ func (h *buildSources) getSource() (string, error) {
 		md5s = append(md5s, genMetaLine(m[k], k))
 	}
 
-	md5 := utils.GenMD5([]byte(strings.Join(md5s, "\n")+"\n"))
+	md5 := utils.GenMD5([]byte(strings.Join(md5s, "\n") + "\n"))
 	if md5 != info.VerifyMd5 {
 		return "", fmt.Errorf(
 			"source verification fails, %s != %s",
@@ -75,9 +75,7 @@ func (h *buildSources) getBdeps(dir string) ([]string, error) {
 	items := h.info.getSrcBDep()
 	meta := make([]string, len(items))
 
-	for i := range items {
-		item := &items[i]
-
+	for i, item := range items {
 		saveTo := filepath.Join(dir, "images", item.Project, item.Package)
 		if err := mkdirAll(saveTo); err != nil {
 			return nil, err

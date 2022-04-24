@@ -1,6 +1,6 @@
 package config
 
-import "github.com/zengchen1024/obs-worker/obsbuild"
+import "github.com/zengchen1024/obs-worker/build"
 
 func Load(path string) (*Config, error) {
 	v := new(Config)
@@ -18,7 +18,7 @@ func Load(path string) (*Config, error) {
 }
 
 type Config struct {
-	Build obsbuild.Config `json:"build"`
+	Build build.Config `json:"build"`
 }
 
 func (c *Config) setDefault() error {

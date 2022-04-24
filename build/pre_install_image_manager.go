@@ -17,28 +17,23 @@ type preInstallImageManager struct {
 	handleRepoBins func(prpa string, bins binary.BinaryVersionList)
 }
 
-func (h *preInstallImageManager) getPkgDir() string {
-	return h.env.pkgdir
-}
-
-func (h *preInstallImageManager) getHttpClient() *utils.HttpClient {
-	return &h.hc
-}
-
 func (h *preInstallImageManager) getPreInstallImage(bins []string) (pre preInstallImage) {
-	info := h.info
-
 	prpas := make(map[string][]string)
 	metas := make(map[string]binary.Binary)
 	hdrmd5s := make(map[string]string)
 	imageOrigins := make(map[string]string)
 	binsSet := sets.NewString(bins...)
 
+	info := h.getBuildInfo()
 	for _, repo := range info.Paths {
 		v, endpoint, err := h.getBinary(&repo, binsSet.UnsortedList())
 		if err != nil {
-			// log it
+			utils.LogErr("getbinaryversions, err:%v", err)
 			continue
+		}
+
+		if len(v.Binaries) == 0 {
+			break
 		}
 
 		prpa := genPrpa(repo.Project, repo.Repository, info.Arch)
@@ -56,13 +51,19 @@ func (h *preInstallImageManager) getPreInstallImage(bins []string) (pre preInsta
 		for i := range items {
 			item := &items[i]
 
-			if bin, _, ok := isBinFile(item.Name); ok {
-				hdrmd5s[bin] = item.HdrMD5
-				imageOrigins[bin] = prpa
-				binsSet.Delete(bin)
+			if item.Error != "" {
+				continue
+			}
 
+			if bin, _, ok := isBinFile(item.Name); ok {
 				if !nometa && item.MetaMD5 != "" {
 					metas[bin] = *item
+				}
+
+				if binsSet.Has(bin) {
+					hdrmd5s[bin] = item.HdrMD5
+					imageOrigins[bin] = prpa
+					binsSet.Delete(bin)
 				}
 			}
 		}
@@ -73,20 +74,16 @@ func (h *preInstallImageManager) getPreInstallImage(bins []string) (pre preInsta
 	}
 
 	if len(prpas) == 0 {
+		utils.LogErr("no prpas")
 		return
 	}
 
-	for k, v := range hdrmd5s {
-		if v == "" {
-			delete(hdrmd5s, k)
-		}
-	}
-
-	for _, item := range info.getAllNotInstallBDep() {
+	for _, item := range info.getNoInstallBDep() {
 		delete(hdrmd5s, item.Name)
 	}
 
 	if len(hdrmd5s) == 0 {
+		utils.LogErr("no hdrmd5s")
 		return
 	}
 
@@ -113,8 +110,10 @@ func (h *preInstallImageManager) getPreInstallImage(bins []string) (pre preInsta
 	return
 }
 
-func (h *preInstallImageManager) getBinary(repo *RepoPath, bins []string) (binary.BinaryVersionList, string, error) {
-	info := h.info
+func (h *preInstallImageManager) getBinary(repo *RepoPath, bins []string) (
+	binary.BinaryVersionList, string, error,
+) {
+	info := h.getBuildInfo()
 
 	endpoint := repo.Server
 	if endpoint == "" {
@@ -132,12 +131,13 @@ func (h *preInstallImageManager) getBinary(repo *RepoPath, bins []string) (binar
 		NoMeta: h.isRepoNoMeta(repo),
 	}
 
-	v, err := binary.List(h.getHttpClient(), endpoint, &opts)
+	v, err := binary.List(h.gethc(), endpoint, &opts)
+
 	return v, endpoint, err
 }
 
 func (h *preInstallImageManager) isRepoNoMeta(repo *RepoPath) bool {
-	info := h.info
+	info := h.getBuildInfo()
 
 	return repo.Project != info.Project ||
 		repo.Repository != info.Repository ||
@@ -155,7 +155,7 @@ func (h *preInstallImageManager) getImagesFromRepo(
 
 	for endpoint, prpa := range prpas {
 		v, err := image.Post(
-			h.getHttpClient(), endpoint,
+			h.gethc(), endpoint,
 			&image.QueryOpts{
 				Prpa: prpa,
 			},
@@ -283,7 +283,7 @@ func (h *preInstallImageManager) isImageInCache(img *imageInfo) bool {
 		return false
 	}
 
-	ifile := img.getImageFilePath(h.getPkgDir())
+	ifile := img.getImageFilePath(h.getPkgdir())
 	os.Remove(ifile)
 
 	if nil != linkOrCopy(cacheFile, ifile) {
@@ -321,10 +321,10 @@ func (h *preInstallImageManager) downloadImage(img *imageInfo) bool {
 		manager.pruneCache(h.getCacheSize()-(n<<10), nil, nil)
 	}
 
-	ifile := img.getImageFilePath(h.getPkgDir())
+	ifile := img.getImageFilePath(h.getPkgdir())
 	os.Remove(ifile)
 
-	err := image.Download(h.getHttpClient(), img.loadFrom, img.img.Prpa, img.img.Path, ifile)
+	err := image.Download(h.gethc(), img.loadFrom, img.img.Prpa, img.img.Path, ifile)
 	if err != nil {
 		return false
 	}
@@ -387,7 +387,7 @@ func (h *preInstallImageManager) getImageMetas(
 			cacheFile := genCacheFile(cacheDir, cacheId)
 
 			// copy from cache
-			tmp := filepath.Join(h.getPkgDir(), bin+".meta")
+			tmp := filepath.Join(h.getPkgdir(), bin+".meta")
 			if nil == linkOrCopy(cacheFile+".meta", tmp) {
 				v, err := utils.GenMd5OfFile(tmp)
 				if err == nil && v == bv.HdrMD5 {
@@ -430,7 +430,7 @@ func (h *preInstallImageManager) downloadImageMeta(
 		}
 	}
 
-	res, err := binary.Download(h.getHttpClient(), endpoint, &opts, h.getPkgDir())
+	res, err := binary.Download(h.gethc(), endpoint, &opts, h.getPkgdir())
 	if err != nil {
 		// log it
 		return false
@@ -453,7 +453,7 @@ func (h *preInstallImageManager) downloadImageMeta(
 			return false
 		}
 
-		metaFile := filepath.Join(h.getPkgDir(), name)
+		metaFile := filepath.Join(h.getPkgdir(), name)
 		v, err := utils.GenMd5OfFile(metaFile)
 		if err != nil {
 			// log it

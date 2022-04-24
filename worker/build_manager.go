@@ -1,7 +1,7 @@
 package worker
 
 import (
-	"github.com/zengchen1024/obs-worker/obsbuild"
+	"github.com/zengchen1024/obs-worker/build"
 	"github.com/zengchen1024/obs-worker/sdk/statistic"
 	"github.com/zengchen1024/obs-worker/sdk/worker"
 	"github.com/zengchen1024/obs-worker/utils"
@@ -16,12 +16,12 @@ type buildManager struct {
 
 	stats statistic.BuildStatistics
 
-	cfg *obsbuild.Config
+	cfg *build.Config
 
 	port int
 }
 
-func Init(cfg *obsbuild.Config, port int) error {
+func Init(cfg *build.Config, port int) error {
 	b := buildManager{
 		cfg:  cfg,
 		port: port,
