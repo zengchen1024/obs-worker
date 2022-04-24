@@ -55,7 +55,7 @@ func (h *buildSources) getSource() (string, error) {
 		md5s = append(md5s, genMetaLine(m[k], k))
 	}
 
-	md5 := utils.GenMD5([]byte(strings.Join(md5s, "\n")))
+	md5 := utils.GenMD5([]byte(strings.Join(md5s, "\n")+"\n"))
 	if md5 != info.VerifyMd5 {
 		return "", fmt.Errorf(
 			"source verification fails, %s != %s",

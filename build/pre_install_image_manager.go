@@ -301,7 +301,7 @@ func (h *preInstallImageManager) isImageInCache(img *imageInfo) bool {
 	if v, err := os.Stat(ifile); err == nil {
 		manager.pruneCache(
 			h.getCacheSize(),
-			[]binCacheInfo{
+			[]cacheBinInfo{
 				{cacheId, int(v.Size())},
 			},
 			nil,
@@ -342,9 +342,9 @@ func (h *preInstallImageManager) downloadImage(img *imageInfo) bool {
 	if nil == writeFile(tmp, []byte(data)) {
 		manager.pruneCache(
 			h.getCacheSize(), nil,
-			[]binCache{
+			[]cacheBin{
 				{
-					binCacheInfo: binCacheInfo{
+					cacheBinInfo: cacheBinInfo{
 						cacheId:   img.genCacheId(),
 						cacheSize: int(v.Size()),
 					},
