@@ -44,64 +44,52 @@ func (b *BuildInfo) getSrcmd5() string {
 	return b.SrcMd5
 }
 
-func (b *BuildInfo) getNotSrcBDep() (r []BDep) {
-	for _, item := range b.BDeps {
-		if item.RepoArch != "src" {
-			r = append(r, item)
-		}
-	}
-
-	return
+func (b *BuildInfo) getNotSrcBDep() []*BDep {
+	return b.getBdep(func(item *BDep) bool {
+		return item.RepoArch != "src"
+	})
 }
 
-func (b *BuildInfo) getSrcBDep() (r []BDep) {
-	for _, item := range b.BDeps {
-		if item.RepoArch == "src" {
-			r = append(r, item)
-		}
-	}
-
-	return
+func (b *BuildInfo) getSrcBDep() []*BDep {
+	return b.getBdep(func(item *BDep) bool {
+		return item.RepoArch == "src"
+	})
 }
 
-func (b *BuildInfo) getNotMetaBDep() (r []BDep) {
-	for _, item := range b.BDeps {
-		if buildinfo.IsTrue(item.NotMeta) && item.RepoArch != "src" {
-			r = append(r, item)
-		}
-	}
-
-	return
+func (b *BuildInfo) getNotMetaBDep() []*BDep {
+	return b.getBdep(func(item *BDep) bool {
+		return item.RepoArch != "src" && buildinfo.IsTrue(item.NotMeta)
+	})
 }
 
-func (b *BuildInfo) getMetaBDep() (r []BDep) {
-	for _, item := range b.BDeps {
-		if !buildinfo.IsTrue(item.NotMeta) {
-			r = append(r, item)
-		}
-	}
-
-	return
+func (b *BuildInfo) getMetaBDep() []*BDep {
+	return b.getBdep(func(item *BDep) bool {
+		return !buildinfo.IsTrue(item.NotMeta)
+	})
 }
 
-func (b *BuildInfo) getNotInstallBDep() (r []BDep) {
-	for _, item := range b.BDeps {
-		if buildinfo.IsTrue(item.NoInstall) && item.RepoArch != "src" {
-			r = append(r, item)
-		}
-	}
-
-	return
+func (b *BuildInfo) getNoInstallButSrcBDep() []*BDep {
+	return b.getBdep(func(item *BDep) bool {
+		return item.RepoArch != "src" && buildinfo.IsTrue(item.NoInstall)
+	})
 }
 
-func (b *BuildInfo) getAllNotInstallBDep() (r []BDep) {
-	for _, item := range b.BDeps {
-		if buildinfo.IsTrue(item.NoInstall) {
+func (b *BuildInfo) getNoInstallBDep() []*BDep {
+	return b.getBdep(func(item *BDep) bool {
+		return buildinfo.IsTrue(item.NoInstall)
+	})
+}
+
+func (b *BuildInfo) getBdep(ok func(*BDep) bool) []*BDep {
+	items := b.BDeps
+	r := make([]*BDep, 0, len(items))
+	for i := range items {
+		if item := &items[i]; ok(item) {
 			r = append(r, item)
 		}
 	}
 
-	return
+	return r
 }
 
 func getkiwimode(info *buildinfo.BuildInfo) string {
