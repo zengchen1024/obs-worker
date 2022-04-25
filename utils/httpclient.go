@@ -78,19 +78,20 @@ func ReadData(r io.Reader, name string, total int64) ([]byte, error) {
 	last := total
 	buf := make([]byte, last)
 
-	var pn int64
-	var start int64
-	for start = 0; last > 0; start += pn {
+	for start, pn := int64(0), int64(0); last > 0; {
 		pn = 8192
 		if last < pn {
 			pn = last
 		}
-		last -= pn
 
-		_, err := ReadOnce(r, name, buf[start:start+pn], true)
+		n, err := ReadOnce(r, name, buf[start:start+pn], false)
 		if err != nil {
 			return nil, err
 		}
+
+		pn = int64(n)
+		start += pn
+		last -= pn
 	}
 
 	return buf, nil

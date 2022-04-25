@@ -28,7 +28,7 @@ func (h *preInstallImageManager) getPreInstallImage(bins []string) (pre preInsta
 	for _, repo := range info.Paths {
 		v, endpoint, err := h.getBinary(&repo, binsSet.UnsortedList())
 		if err != nil {
-			utils.LogErr("getbinaryversions, err:%v", err)
+			utils.LogErr("getbinaryversions, err:%v\n", err)
 			continue
 		}
 
@@ -74,7 +74,7 @@ func (h *preInstallImageManager) getPreInstallImage(bins []string) (pre preInsta
 	}
 
 	if len(prpas) == 0 {
-		utils.LogErr("no prpas")
+		utils.LogErr("no prpas\n")
 		return
 	}
 
@@ -83,7 +83,7 @@ func (h *preInstallImageManager) getPreInstallImage(bins []string) (pre preInsta
 	}
 
 	if len(hdrmd5s) == 0 {
-		utils.LogErr("no hdrmd5s")
+		utils.LogErr("no hdrmd5s\n")
 		return
 	}
 
@@ -99,6 +99,10 @@ func (h *preInstallImageManager) getPreInstallImage(bins []string) (pre preInsta
 	}
 
 	img := h.chooseBestImage(imageList, hdrmd5s, metas)
+	if img == nil {
+		return
+	}
+
 	pre.img = *img.img
 
 	imagesWithMeta := sets.NewString()
@@ -148,8 +152,14 @@ func (h *preInstallImageManager) getImagesFromRepo(
 	hdrmd5s map[string]string,
 	prpas map[string][]string,
 ) map[string][]image.Image {
-	// TODO: how to generate match
 	match := make([]byte, 512)
+	for _, item := range hdrmd5s {
+		offset, _ := strconv.ParseInt(item[0:3], 16, 32)
+		i := offset >> 3
+		p := offset & 0x7
+
+		match[i] |= 1 << p
+	}
 
 	images := make(map[string][]image.Image)
 
@@ -162,7 +172,7 @@ func (h *preInstallImageManager) getImagesFromRepo(
 			match,
 		)
 		if err != nil {
-			// log it
+			utils.LogErr("getpreinstallimageinfos, err = %v\n", err)
 			continue
 		}
 
