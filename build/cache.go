@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"sigs.k8s.io/yaml"
 
 	"github.com/zengchen1024/obs-worker/utils"
 )
@@ -14,8 +17,8 @@ func genCacheId(prpa, hdrmd5 string) string {
 	))
 }
 
-func genCacheFile(cacheDir, cacheId string) string {
-	return filepath.Join(cacheDir, cacheId[0:2], cacheId)
+func genCacheFile(cacheDir, Id string) string {
+	return filepath.Join(cacheDir, Id[0:2], Id)
 }
 
 type cacheBin struct {
@@ -24,7 +27,7 @@ type cacheBin struct {
 	cacheBinInfo
 }
 
-func (c cacheBin) getBinMetaFile() string {
+func (c *cacheBin) getBinMetaFile() string {
 	if bin, _, ok := isBinFile(c.binFile); ok {
 		return bin + ".meta"
 	}
@@ -33,28 +36,88 @@ func (c cacheBin) getBinMetaFile() string {
 }
 
 type cacheBinInfo struct {
-	cacheId   string
-	cacheSize int
+	Id   string `json:"id"`
+	Size int    `json:"size"`
 }
 
-func (c cacheBinInfo) getCacheFile(cacheDir string) string {
-	return filepath.Join(cacheDir, c.cacheId[0:2], c.cacheId)
+func (c *cacheBinInfo) toString() string {
+	return fmt.Sprintf("%s %d", c.Id, c.Size)
+}
+
+func (c *cacheBinInfo) getCacheFile(cacheDir string) string {
+	return genCacheFile(cacheDir, c.Id)
+}
+
+func (c *cacheBinInfo) remove(cacheDir string) {
+	f := c.getCacheFile(cacheDir)
+	os.Remove(f)
+	os.Remove(f + ".meta")
 }
 
 type cacheManager struct {
 	*buildHelper
+
+	perlScriptDir    string
+	parseCacheScript string
+	setCacheScript   string
 }
 
-// read from "/var/cache/obs/worker/cache/content"
-// filter the items which does not have size
-func (h *cacheManager) getCurrentCache(cf utils.FileOp) ([]cacheBinInfo, error) {
-	//TODO
-	return nil, nil
+func (h *cacheManager) init() error {
+	dir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	h.perlScriptDir = filepath.Join(dir, "perl")
+	h.parseCacheScript = filepath.Join(h.perlScriptDir, "parse_cache_content.pm")
+	h.setCacheScript = filepath.Join(h.perlScriptDir, "store_cache_content.pm")
+
+	return nil
+}
+
+func (h *cacheManager) getCurrentCacheInfo(cf utils.FileOp) ([]cacheBinInfo, error) {
+	cache := struct {
+		Content []cacheBinInfo `json:"content"`
+	}{}
+
+	v, err := utils.RunCmd(
+		"perl",
+		"-I", h.perlScriptDir,
+		h.parseCacheScript, h.getCacheDir(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%s, %v", v, err)
+	}
+
+	if err = yaml.Unmarshal([]byte(v), &cache); err != nil {
+		return nil, err
+	}
+
+	return cache.Content, nil
+}
+
+func (h *cacheManager) setCacheInfo(cache []cacheBinInfo) error {
+	s := make([]string, 0, len(cache))
+	for _, item := range cache {
+		if item.Size > 0 {
+			s = append(s, item.toString())
+		}
+	}
+
+	v, err := utils.RunCmd(
+		"perl",
+		"-I", h.perlScriptDir,
+		h.setCacheScript, h.getCacheDir(), strings.Join(s, "\n"),
+	)
+	if err != nil {
+		return fmt.Errorf("%s, %v", v, err)
+	}
+
+	return nil
 }
 
 func (h *cacheManager) addNewCache(caches []cacheBin) ([]cacheBinInfo, error) {
 	cacheDir := h.getCacheDir()
-
 	r := []cacheBinInfo{}
 
 	for i := len(caches) - 1; i >= 0; i-- {
@@ -62,30 +125,36 @@ func (h *cacheManager) addNewCache(caches []cacheBin) ([]cacheBinInfo, error) {
 
 		// copy bin File
 		cacheFile := c.getCacheFile(cacheDir)
+
 		mkdirAll(filepath.Dir(cacheFile))
 
 		tmp := cacheFile + ".$$"
 
 		if err := linkOrCopy(c.binFile, tmp); err != nil {
+			utils.LogErr("copy %s to %s, err:%v\n", c.binFile, tmp, err)
+
 			continue
 		}
 
 		if err := os.Rename(tmp, cacheFile); err != nil {
 			os.Remove(tmp)
+			utils.LogErr("rename %s to %s, err:%v\n", tmp, cacheFile, err)
+
 			return nil, err
 		}
 
 		// copy meta file
-		cacheMetaFile := cacheFile + ".meta"
-		os.Remove(cacheMetaFile)
+		cacheFileMeta := cacheFile + ".meta"
+		os.Remove(cacheFileMeta)
 
 		metaFile := c.getBinMetaFile()
 		if b, err := isEmptyFile(metaFile); err == nil && !b {
-			tmp = cacheMetaFile + ".$$"
+			tmp = cacheFileMeta + ".$$"
 
 			if err := linkOrCopy(metaFile, tmp); err == nil {
-				if err = os.Rename(tmp, cacheMetaFile); err != nil {
+				if err = os.Rename(tmp, cacheFileMeta); err != nil {
 					os.Remove(tmp)
+
 					return nil, err
 				}
 			}
@@ -113,7 +182,7 @@ func (h *cacheManager) pruneCache(pruneSize int, oldCache []cacheBinInfo, news [
 		return err
 	}
 
-	v, err := h.getCurrentCache(cf)
+	v, err := h.getCurrentCacheInfo(cf)
 	if err != nil {
 		return err
 	}
@@ -125,7 +194,7 @@ func (h *cacheManager) pruneCache(pruneSize int, oldCache []cacheBinInfo, news [
 
 	var i int
 	for i = range caches {
-		pruneSize -= caches[i].cacheSize
+		pruneSize -= caches[i].Size
 		if pruneSize < 0 {
 			break
 		}
@@ -133,19 +202,17 @@ func (h *cacheManager) pruneCache(pruneSize int, oldCache []cacheBinInfo, news [
 
 	cacheDir := h.getCacheDir()
 
-	for j := i; j < len(caches); j++ {
-		f := caches[j].getCacheFile(cacheDir)
-		os.Remove(f)
-		os.Remove(f + ".meta")
+	n := len(caches)
+	for j := i; j < n; j++ {
+		caches[j].remove(cacheDir)
 	}
 
-	//save caches[0:i] to cacheDir/content (/var/cache/obs/worker/cache/content)
-	// if save failed, delete all new caches
+	if err := h.setCacheInfo(caches[0:i]); err != nil {
+		for j := range v1 {
+			caches[j].remove(cacheDir)
+		}
 
-	for j := range v1 {
-		f := v1[j].getCacheFile(cacheDir)
-		os.Remove(f)
-		os.Remove(f + ".meta")
+		return err
 	}
 
 	return nil

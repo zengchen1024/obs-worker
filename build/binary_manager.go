@@ -18,6 +18,8 @@ type binaryInfo struct {
 type binaryManager struct {
 	*buildHelper
 
+	cache *cacheManager
+
 	knowns map[string]binary.BinaryVersionList
 
 	handleCacheHits       func(int)
@@ -51,14 +53,12 @@ func (h *binaryManager) get(
 		total += v
 	}
 
-	manager := cacheManager{h.buildHelper}
-
 	cacheDir := h.getCacheDir()
 	if cacheDir != "" && len(toDownload) > 0 {
 		cacheSize := h.getCacheSize()
 
 		if n := total << 10; n*100 > cacheSize {
-			manager.pruneCache(cacheSize-n, nil, nil)
+			h.cache.pruneCache(cacheSize-n, nil, nil)
 		}
 	}
 
@@ -68,7 +68,7 @@ func (h *binaryManager) get(
 	}
 
 	if cacheDir != "" {
-		manager.pruneCache(h.getCacheSize(), oldCache, newCaches)
+		h.cache.pruneCache(h.getCacheSize(), oldCache, newCaches)
 	}
 
 	if binInfo.NoMeta {

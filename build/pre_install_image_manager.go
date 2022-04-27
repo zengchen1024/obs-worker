@@ -14,6 +14,8 @@ import (
 type preInstallImageManager struct {
 	*buildHelper
 
+	cache *cacheManager
+
 	handleRepoBins func(prpa string, bins binary.BinaryVersionList)
 }
 
@@ -36,7 +38,7 @@ func (h *preInstallImageManager) getPreInstallImage(bins []string) (pre preInsta
 			break
 		}
 
-		prpa := genPrpa(repo.Project, repo.Repository, info.Arch)
+		prpa := info.getPrpaOfRepo(&repo)
 
 		if h.handleRepoBins != nil {
 			h.handleRepoBins(prpa, v)
@@ -46,7 +48,7 @@ func (h *preInstallImageManager) getPreInstallImage(bins []string) (pre preInsta
 			prpas[endpoint] = append(prpas[endpoint], prpa)
 		}
 
-		nometa := h.isRepoNoMeta(&repo)
+		nometa := info.isRepoNoMeta(&repo)
 		items := v.Binaries
 		for i := range items {
 			item := &items[i]
@@ -87,7 +89,7 @@ func (h *preInstallImageManager) getPreInstallImage(bins []string) (pre preInsta
 		return
 	}
 
-	// ok, now check if there is an image on one of the repo servers
+	// Now, check if there is an image in one of the repo servers
 
 	images := h.getImagesFromRepo(hdrmd5s, prpas)
 
@@ -119,11 +121,6 @@ func (h *preInstallImageManager) getBinary(repo *RepoPath, bins []string) (
 ) {
 	info := h.getBuildInfo()
 
-	endpoint := repo.Server
-	if endpoint == "" {
-		endpoint = info.RepoServer
-	}
-
 	opts := binary.ListOpts{
 		CommonOpts: binary.CommonOpts{
 			Project:    repo.Project,
@@ -132,20 +129,13 @@ func (h *preInstallImageManager) getBinary(repo *RepoPath, bins []string) (
 			Modules:    info.Modules,
 			Binaries:   bins,
 		},
-		NoMeta: h.isRepoNoMeta(repo),
+		NoMeta: info.isRepoNoMeta(repo),
 	}
 
+	endpoint := info.getRepoServer(repo)
 	v, err := binary.List(h.gethc(), endpoint, &opts)
 
 	return v, endpoint, err
-}
-
-func (h *preInstallImageManager) isRepoNoMeta(repo *RepoPath) bool {
-	info := h.getBuildInfo()
-
-	return repo.Project != info.Project ||
-		repo.Repository != info.Repository ||
-		info.isPreInstallImage()
 }
 
 func (h *preInstallImageManager) getImagesFromRepo(
@@ -182,12 +172,6 @@ func (h *preInstallImageManager) getImagesFromRepo(
 	return images
 }
 
-func (h *preInstallImageManager) getPrpa() string {
-	v := h.info
-
-	return genPrpa(v.Project, v.Repository, v.Arch)
-}
-
 func (h *preInstallImageManager) chooseBestImage(
 	images []imageInfo,
 	hdrmd5s map[string]string,
@@ -198,7 +182,8 @@ func (h *preInstallImageManager) chooseBestImage(
 		neededHdrmd5s.Insert(v)
 	}
 
-	prpa := h.getPrpa()
+	prpa := h.getBuildInfo().getPrpa()
+
 	var bestImage *imageInfo
 	for {
 		bestImage := h.findBestImage(images, neededHdrmd5s, prpa, bestImage)
@@ -306,10 +291,8 @@ func (h *preInstallImageManager) isImageInCache(img *imageInfo) bool {
 		return false
 	}
 
-	manager := cacheManager{h.buildHelper}
-
 	if v, err := os.Stat(ifile); err == nil {
-		manager.pruneCache(
+		h.cache.pruneCache(
 			h.getCacheSize(),
 			[]cacheBinInfo{
 				{cacheId, int(v.Size())},
@@ -322,13 +305,11 @@ func (h *preInstallImageManager) isImageInCache(img *imageInfo) bool {
 }
 
 func (h *preInstallImageManager) downloadImage(img *imageInfo) bool {
-	manager := cacheManager{h.buildHelper}
-
 	cacheDir := h.getCacheDir()
 	if cacheDir != "" {
 		// make room
 		n, _ := strconv.Atoi(img.img.SizeK)
-		manager.pruneCache(h.getCacheSize()-(n<<10), nil, nil)
+		h.cache.pruneCache(h.getCacheSize()-(n<<10), nil, nil)
 	}
 
 	ifile := img.getImageFilePath(h.getPkgdir())
@@ -350,13 +331,13 @@ func (h *preInstallImageManager) downloadImage(img *imageInfo) bool {
 	data := img.genCacheMeta()
 	tmp := ifile + ".meta"
 	if nil == writeFile(tmp, []byte(data)) {
-		manager.pruneCache(
+		h.cache.pruneCache(
 			h.getCacheSize(), nil,
 			[]cacheBin{
 				{
 					cacheBinInfo: cacheBinInfo{
-						cacheId:   img.genCacheId(),
-						cacheSize: int(v.Size()),
+						Id:   img.genCacheId(),
+						Size: int(v.Size()),
 					},
 					binFile: ifile,
 				},
@@ -385,7 +366,7 @@ func (h *preInstallImageManager) getImageMetas(
 
 	todo := bins
 
-	prpa := h.getPrpa()
+	prpa := h.getBuildInfo().getPrpa()
 	cacheDir := h.getCacheDir()
 	if cacheDir != "" {
 		todo = sets.NewString()
@@ -421,7 +402,8 @@ func (h *preInstallImageManager) downloadImageMeta(
 	todo sets.String,
 	metas map[string]binary.Binary,
 ) bool {
-	info := h.info
+	info := h.getBuildInfo()
+
 	opts := binary.DownloadOpts{
 		CommonOpts: binary.CommonOpts{
 			WorkerId:   h.getWorkerId(),
@@ -446,7 +428,7 @@ func (h *preInstallImageManager) downloadImageMeta(
 		return false
 	}
 
-	prpa := h.getPrpa()
+	prpa := info.getPrpa()
 	cacheDir := h.getCacheDir()
 
 	done := sets.NewString()

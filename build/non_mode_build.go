@@ -20,11 +20,12 @@ type nonModeBuid struct {
 	stats         buildStats
 	build         buildPkg
 	sources       buildSources
+	cache         cacheManager
 
 	needOBSPackage bool
 }
 
-func newNonModeBuild(cfg *Config, info *buildinfo.BuildInfo) *nonModeBuid {
+func newNonModeBuild(cfg *Config, info *buildinfo.BuildInfo) (*nonModeBuid, error) {
 	b := nonModeBuid{
 		buildHelper: buildHelper{
 			cfg:  cfg,
@@ -36,8 +37,16 @@ func newNonModeBuild(cfg *Config, info *buildinfo.BuildInfo) *nonModeBuid {
 
 	b.sources = buildSources{h}
 
+	b.cache = cacheManager{
+		buildHelper: h,
+	}
+	if err := b.cache.init(); err != nil {
+		return nil, err
+	}
+
 	b.binaryManager = binaryManager{
 		buildHelper:           h,
+		cache:                 &b.cache,
 		handleCacheHits:       b.stats.setCacheHit,
 		handleDownloadDetails: b.stats.setBinaryDownloadDetail,
 	}
@@ -45,6 +54,7 @@ func newNonModeBuild(cfg *Config, info *buildinfo.BuildInfo) *nonModeBuid {
 
 	b.imageManager = preInstallImageManager{
 		buildHelper:    h,
+		cache:          &b.cache,
 		handleRepoBins: b.binaryManager.setKnownBins,
 	}
 
@@ -61,7 +71,7 @@ func newNonModeBuild(cfg *Config, info *buildinfo.BuildInfo) *nonModeBuid {
 		},
 	}
 
-	return &b
+	return &b, nil
 }
 
 func (b *nonModeBuid) Do() error {

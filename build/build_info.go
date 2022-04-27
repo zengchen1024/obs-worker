@@ -92,6 +92,28 @@ func (b *BuildInfo) getBdep(ok func(*BDep) bool) []*BDep {
 	return r
 }
 
+func (b *BuildInfo) isRepoNoMeta(repo *RepoPath) bool {
+	return repo.Project != b.Project ||
+		repo.Repository != b.Repository ||
+		b.isPreInstallImage()
+}
+
+func (b *BuildInfo) getRepoServer(repo *RepoPath) string {
+	if repo.Server != "" {
+		return repo.Server
+	}
+
+	return b.RepoServer
+}
+
+func (b *BuildInfo) getPrpaOfRepo(repo *RepoPath) string {
+	return genPrpa(repo.Project, repo.Repository, b.Arch)
+}
+
+func (b *BuildInfo) getPrpa() string {
+	return genPrpa(b.Project, b.Repository, b.Arch)
+}
+
 func getkiwimode(info *buildinfo.BuildInfo) string {
 	re := regexp.MustCompile("^_service:.*:")
 	v := re.ReplaceAllString(info.File, "")
