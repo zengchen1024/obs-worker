@@ -2,6 +2,7 @@ package build
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/huaweicloud/golangsdk"
 	"github.com/zengchen1024/obs-worker/utils"
@@ -161,7 +162,7 @@ func (c *Config) SetDefault() error {
 		if err != nil {
 			return fmt.Errorf("get host arch failed, err: %v, %v", string(out), err)
 		}
-		c.HostArch = out
+		c.HostArch = strings.TrimSuffix(string(out), "\n")
 	}
 
 	if c.Jobs == 0 {

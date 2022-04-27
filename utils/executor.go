@@ -1,14 +1,11 @@
 package utils
 
-import (
-	"os/exec"
-	"strings"
-)
+import "os/exec"
 
-func RunCmd(args ...string) (string, error) {
+func RunCmd(args ...string) ([]byte, error) {
 	n := len(args)
 	if n == 0 {
-		return "", nil
+		return nil, nil
 	}
 
 	cmd := args[0]
@@ -20,7 +17,5 @@ func RunCmd(args ...string) (string, error) {
 	}
 
 	c := exec.Command(cmd, args...)
-	out, err := c.CombinedOutput()
-
-	return strings.TrimSuffix(string(out), "\n"), err
+	return c.CombinedOutput()
 }

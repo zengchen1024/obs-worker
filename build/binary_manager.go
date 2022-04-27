@@ -26,90 +26,155 @@ type binaryManager struct {
 	handleDownloadDetails func(num, size int)
 }
 
-func (h *binaryManager) init() {
-	h.knowns = make(map[string]binary.BinaryVersionList)
+func (b *binaryManager) init() {
+	b.knowns = make(map[string]binary.BinaryVersionList)
 }
 
-func (h *binaryManager) getHttpClient() *utils.HttpClient {
-	return &h.hc
+func (b *binaryManager) setKnownBins(prpa string, bins binary.BinaryVersionList) {
+	b.knowns[prpa] = bins
 }
 
-func (h *binaryManager) setKnownBins(prpa string, bins binary.BinaryVersionList) {
-	h.knowns[prpa] = bins
-}
+func (b *binaryManager) get(dir string, repo *RepoPath, bins []string) (map[string]binaryInfo, error) {
+	h := &binaryManagerHelper{
+		buildHelper: b.buildHelper,
+	}
+	h.init(dir, repo)
 
-func (h *binaryManager) get(
-	dir, repoServer string,
-	binInfo *binary.ListOpts,
-) (map[string]binaryInfo, error) {
-	bv := h.getBinaries(repoServer, binInfo)
+	oldCache, toDownload, total := h.getDownloads(bins, b.knowns)
 
-	ret, oldCache, toDownload := h.getDownloads(dir, binInfo, bv)
-
-	total := 0
-	bins := []string{}
-	for k, v := range toDownload {
-		bins = append(bins, k)
-		total += v
+	if b.handleCacheHits != nil {
+		b.handleCacheHits(len(oldCache))
 	}
 
-	cacheDir := h.getCacheDir()
-	if cacheDir != "" && len(toDownload) > 0 {
-		cacheSize := h.getCacheSize()
+	cacheDir := b.getCacheDir()
 
-		if n := total << 10; n*100 > cacheSize {
-			h.cache.pruneCache(cacheSize-n, nil, nil)
+	var newCaches []cacheBin
+
+	if n := len(toDownload); n > 0 {
+		if b.handleDownloadDetails != nil {
+			b.handleDownloadDetails(n, total)
 		}
-	}
 
-	newCaches, err := h.download(dir, repoServer, binInfo, bins, ret)
-	if err != nil {
-		return nil, err
+		if cacheDir != "" {
+			cacheSize := b.getCacheSize()
+
+			if v := total << 10; v*100 > cacheSize {
+				b.cache.pruneCache(cacheSize-v, nil, nil)
+			}
+		}
+
+		var err error
+		newCaches, err = h.download(toDownload)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if cacheDir != "" {
-		h.cache.pruneCache(h.getCacheSize(), oldCache, newCaches)
+		b.cache.pruneCache(b.getCacheSize(), oldCache, newCaches)
 	}
 
-	if binInfo.NoMeta {
-		for k, v := range ret {
-			if v.hasMeta {
-				os.Remove(filepath.Join(dir, k+".meta"))
-
-				v.hasMeta = false
-				ret[k] = v
-			}
-		}
-	}
-
-	return ret, nil
+	return h.getBinaries(), nil
 }
 
-func (h *binaryManager) getBinaries(
-	repoServer string,
-	binInfo *binary.ListOpts,
-) map[string]*binary.Binary {
-	f := func(bl []binary.Binary) map[string]*binary.Binary {
-		bv := make(map[string]*binary.Binary)
-		for i := range bl {
-			item := &bl[i]
+type binaryManagerHelper struct {
+	*buildHelper
 
-			if item.Error != "" {
-				bv[item.Name] = item
-			} else if bin, _, ok := isBinFile(item.Name); ok {
-				bv[bin] = item
-			}
-		}
+	commonOpts binary.CommonOpts
+	dir        string
+	prpa       string
+	repoServer string
+	nometa     bool
 
-		return bv
+	binaries map[string]binaryInfo
+}
+
+func (h *binaryManagerHelper) init(dir string, repo *RepoPath) {
+	info := h.getBuildInfo()
+
+	h.commonOpts = binary.CommonOpts{
+		WorkerId:   h.cfg.Id,
+		Project:    repo.Project,
+		Repository: repo.Repository,
+		Arch:       info.Arch,
+		Modules:    info.Modules,
 	}
 
-	prpa := genPrpa(binInfo.Project, binInfo.Repository, binInfo.Arch)
-	if v, ok := h.knowns[prpa]; ok {
-		hasAll := true
-		bv := f(v.Binaries)
+	h.dir = dir
+	h.prpa = info.getPrpaOfRepo(repo)
+	h.nometa = info.isRepoNoMeta(repo)
+	h.binaries = make(map[string]binaryInfo)
+	h.repoServer = info.getRepoServer(repo)
+}
 
-		for _, k := range binInfo.Binaries {
+func (h *binaryManagerHelper) getBinaries() map[string]binaryInfo {
+	if !h.nometa {
+		return h.binaries
+	}
+
+	ret := h.binaries
+
+	for k, v := range ret {
+		if v.hasMeta {
+			os.Remove(filepath.Join(h.dir, k+".meta"))
+
+			v.hasMeta = false
+			ret[k] = v
+		}
+	}
+
+	return ret
+}
+
+func (h *binaryManagerHelper) toBinaryMap(bl []binary.Binary) map[string]*binary.Binary {
+	bv := make(map[string]*binary.Binary)
+
+	for i := range bl {
+		item := &bl[i]
+
+		if item.Error != "" {
+			bv[item.Name] = item
+		} else if bin, _, ok := isBinFile(item.Name); ok {
+			bv[bin] = item
+		}
+	}
+
+	return bv
+}
+
+func (h *binaryManagerHelper) listBinaries(bins []string) (binary.BinaryVersionList, error) {
+	opts := h.commonOpts
+	opts.Binaries = bins
+
+	v, err := binary.List(
+		h.gethc(),
+		h.repoServer,
+		&binary.ListOpts{
+			CommonOpts: opts,
+			NoMeta:     h.nometa,
+		},
+	)
+
+	if err != nil {
+		utils.LogErr("getbinaryversions, err:%v\n", err)
+	}
+
+	return v, err
+}
+
+func (h *binaryManagerHelper) checkByKnowns(
+	bins []string,
+	knowns map[string]binary.BinaryVersionList,
+) map[string]*binary.Binary {
+	if h.getCacheDir() == "" {
+		return nil
+	}
+
+	if v, ok := knowns[h.prpa]; ok {
+		hasAll := true
+		bv := h.toBinaryMap(v.Binaries)
+
+		for _, k := range bins {
 			if _, ok := bv[k]; !ok {
 				hasAll = false
 				break
@@ -121,49 +186,45 @@ func (h *binaryManager) getBinaries(
 		}
 	}
 
-	if cacheDir := h.getCacheDir(); cacheDir != "" {
-		v, err := binary.List(h.getHttpClient(), repoServer, binInfo)
-		if err == nil {
-			h.knowns[prpa] = v
-
-			return f(v.Binaries)
-		}
-	}
-
 	return nil
 }
 
-func (h *binaryManager) getDownloads(dir string, binInfo *binary.ListOpts, bv map[string]*binary.Binary) (
-	binaries map[string]binaryInfo,
+func (h *binaryManagerHelper) getDownloads(
+	bins []string,
+	knowns map[string]binary.BinaryVersionList,
+) (
 	oldCache []cacheBinInfo,
-	toDownload map[string]int,
+	toDownload []string,
+	size int,
 ) {
-	prpa := genPrpa(binInfo.Project, binInfo.Repository, binInfo.Arch)
 	cacheDir := h.getCacheDir()
 
-	toDownload = make(map[string]int)
-	oldCache = []cacheBinInfo{}
+	bv := h.checkByKnowns(bins, knowns)
+	if bv == nil && cacheDir != "" {
+		if v, err := h.listBinaries(bins); err == nil {
+			bv = h.toBinaryMap(v.Binaries)
+		}
+	}
 
-	for _, binName := range binInfo.Binaries {
+	for _, binName := range bins {
 		bin, ok := bv[binName]
 		if !ok {
-			toDownload[binName] = 0
+			toDownload = append(toDownload, binName)
 			continue
 		}
 		if bin.Error != "" {
 			continue
 		}
 
-		useCache, haveMeta, cache := h.checkInCache(
-			dir, binName, bin, cacheDir, prpa, binInfo.NoMeta,
-		)
+		useCache, haveMeta, cache := h.checkInCache(binName, bin)
 
 		if !useCache {
-			toDownload[binName] = bin.SizeK
+			toDownload = append(toDownload, binName)
+			size += bin.SizeK
 		} else {
 			oldCache = append(oldCache, cache)
 
-			binaries[binName] = binaryInfo{
+			h.binaries[binName] = binaryInfo{
 				name:    bin.Name,
 				hdrmd5:  bin.HdrMD5,
 				hasMeta: haveMeta,
@@ -174,32 +235,34 @@ func (h *binaryManager) getDownloads(dir string, binInfo *binary.ListOpts, bv ma
 	return
 }
 
-func (h *binaryManager) checkInCache(
-	dir, binName string, bin *binary.Binary, cacheDir, prpa string, nometa bool,
-) (
+func (h *binaryManagerHelper) checkInCache(binName string, bin *binary.Binary) (
 	useCache bool,
 	haveMeta bool,
 	cache cacheBinInfo,
 ) {
+	cacheDir := h.getCacheDir()
 	if cacheDir == "" {
 		return
 	}
 
-	cacheId := genCacheId(prpa, bin.HdrMD5)
+	cacheId := genCacheId(h.prpa, bin.HdrMD5)
 	cacheFile := genCacheFile(cacheDir, cacheId)
 
-	to := filepath.Join(dir, bin.Name)
+	to := filepath.Join(h.dir, bin.Name)
 	if nil != linkOrCopy(cacheFile, to) {
 		return
 	}
 
 	useCache = true
 
-	if !nometa && bin.HdrMD5 != "" {
-		tmp := filepath.Join(dir, binName+".meta")
+	if !h.nometa && bin.HdrMD5 != "" {
+		tmp := filepath.Join(h.dir, binName+".meta")
 
 		if nil == linkOrCopy(cacheFile+".meta", tmp) {
-			md5, _ := utils.GenMd5OfFile(tmp)
+			md5, err := utils.GenMd5OfFile(tmp)
+			if err != nil {
+				utils.LogErr("gen md5 of file:%s, err:%v\n", tmp, err)
+			}
 
 			if md5 == bin.MetaMD5 {
 				haveMeta = true
@@ -214,8 +277,12 @@ func (h *binaryManager) checkInCache(
 	}
 
 	if useCache && queryHdrmd5(to) == bin.HdrMD5 {
-		stat, _ := os.Stat(to)
-		cache = cacheBinInfo{cacheId, int(stat.Size())}
+		stat, err := os.Stat(to)
+		if err != nil {
+			utils.LogErr("stat file:%s, err:%v\n", to, err)
+		} else {
+			cache = cacheBinInfo{cacheId, int(stat.Size())}
+		}
 
 		return
 	}
@@ -226,29 +293,17 @@ func (h *binaryManager) checkInCache(
 	return
 }
 
-func (h *binaryManager) download(
-	dir, repoServer string,
-	binInfo *binary.ListOpts,
-	toDownload []string,
-	binaries map[string]binaryInfo,
-) ([]cacheBin, error) {
-	if len(toDownload) == 0 {
-		return nil, nil
-	}
-
+func (h *binaryManagerHelper) download(toDownload []string) ([]cacheBin, error) {
 	opts := binary.DownloadOpts{
-		CommonOpts: binInfo.CommonOpts,
+		CommonOpts: h.commonOpts,
 	}
 	opts.Binaries = toDownload
 
-	res, err := binary.Download(h.getHttpClient(), repoServer, &opts, dir)
+	res, err := binary.Download(h.gethc(), h.repoServer, &opts, h.dir)
 	if err != nil {
-		// TODO: ignore 404
-		// log it
+		utils.LogErr("call api of getbinaries, err:%v\n", err)
 		return nil, err
 	}
-
-	prpa := genPrpa(binInfo.Project, binInfo.Repository, binInfo.Arch)
 
 	haveMeta := sets.NewString()
 	newCaches := []cacheBin{}
@@ -257,19 +312,34 @@ func (h *binaryManager) download(
 		name := res[i].Name
 
 		if bin, _, ok := isBinFile(name); ok {
-			tmp := filepath.Join(dir, name)
-			stat, _ := os.Stat(tmp)
-			md5, _ := utils.GenMd5OfFile(tmp)
+			tmp := filepath.Join(h.dir, name)
 
-			newCaches = append(newCaches, cacheBin{
-				cacheBinInfo: cacheBinInfo{
-					genCacheId(prpa, md5),
-					int(stat.Size()),
+			stat, err := os.Stat(tmp)
+			if err != nil {
+				utils.LogErr("stat %s, err:%v\n", tmp, err)
+
+				continue
+			}
+
+			md5, err := utils.GenMd5OfFile(tmp)
+			if err != nil {
+				utils.LogErr("gen md5 of %s, err:%v\n", tmp, err)
+
+				continue
+			}
+
+			newCaches = append(
+				newCaches,
+				cacheBin{
+					cacheBinInfo: cacheBinInfo{
+						Id:   genCacheId(h.prpa, md5),
+						Size: int(stat.Size()),
+					},
+					binFile: tmp,
 				},
-				binFile: tmp,
-			})
+			)
 
-			binaries[bin] = binaryInfo{
+			h.binaries[bin] = binaryInfo{
 				name:   name,
 				hdrmd5: md5,
 			}
@@ -280,9 +350,9 @@ func (h *binaryManager) download(
 	}
 
 	for k := range haveMeta {
-		if v, ok := binaries[k]; ok {
+		if v, ok := h.binaries[k]; ok {
 			v.hasMeta = true
-			binaries[k] = v
+			h.binaries[k] = v
 		}
 	}
 
