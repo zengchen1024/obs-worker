@@ -33,6 +33,7 @@ type BuildInfo struct {
 	Release        string `xml:"release"`
 	DebugInfo      string `xml:"debuginfo"`
 	ConstraintsMd5 string `xml:"constraintsmd5"`
+	GenMetaAlgo    int    `xml:"genmetaalgo"`
 
 	SubPacks  []string `xml:"subpack"`
 	ImageType []string `xml:"imagetype"`

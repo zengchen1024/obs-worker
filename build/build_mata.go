@@ -9,8 +9,8 @@ import (
 
 type metaHelper struct {
 	deps        []string
-	subpackPath sets.String
 	cycle       sets.String
+	subpackPath sets.String
 }
 
 func (h *metaHelper) genMeta(algorithm int) []string {
@@ -123,6 +123,8 @@ func (h *metaHelper) prune() []string {
 		}
 
 		depSeen.Insert(hk)
+
+		meta = append(meta, line)
 	}
 
 	return meta
