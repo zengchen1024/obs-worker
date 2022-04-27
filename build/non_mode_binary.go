@@ -8,7 +8,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/zengchen1024/obs-worker/sdk/binary"
+	"github.com/zengchen1024/obs-worker/utils"
 )
 
 type nonModeBinary struct {
@@ -17,11 +17,18 @@ type nonModeBinary struct {
 	binaryManager *binaryManager
 	imageManager  *preInstallImageManager
 
+	handleOutBDep    func(BDep)
 	handleImage      func(*preInstallImage)
 	handleKiwiOrigin func(k, v string)
 }
 
 func (h *nonModeBinary) getBinaries(considerPreInstallImg bool) ([]string, error) {
+	if dir := h.getPkgdir(); !isFileExist(dir) {
+		if err := mkdir(dir); err != nil {
+			return nil, err
+		}
+	}
+
 	v := h.info.getNotSrcBDep()
 	if len(v) == 0 {
 		return nil, fmt.Errorf("no binaries needed for this package")
@@ -39,7 +46,7 @@ func (h *nonModeBinary) getBinaries(considerPreInstallImg bool) ([]string, error
 		imageBins, imagesWithMeta = h.filterByPreInstallImage(todo)
 	}
 
-	done, metas := h.getBinaryCache(todo, nil)
+	done, metas := h.getBinaryCache(todo)
 
 	if todo.Len() > 0 {
 		return nil, fmt.Errorf(
@@ -68,6 +75,10 @@ func (h *nonModeBinary) filterByPreInstallImage(todo sets.String) (
 
 	imageBins, imagesWithMeta, _ = img.getImageBins()
 
+	if h.handleOutBDep != nil {
+		//TODO
+	}
+
 	for k := range todo {
 		if _, ok := imageBins[k]; ok {
 			todo.Delete(k)
@@ -77,55 +88,40 @@ func (h *nonModeBinary) filterByPreInstallImage(todo sets.String) (
 	return
 }
 
-func (h *nonModeBinary) getBinaryCache(
-	bins sets.String,
-	knownBinaries map[string][]binary.Binary,
-) (map[string]string, sets.String) {
+func (h *nonModeBinary) getBinaryCache(bins sets.String) (map[string]string, sets.String) {
 	done := make(map[string]string)
 	imagesWithMeta := sets.NewString()
 
-	info := h.info
-	for _, repo := range info.Paths {
+	info := h.getBuildInfo()
+	for i := range info.Paths {
 		if bins.Len() == 0 {
 			break
 		}
 
-		server := repo.Server
-		if server == "" {
-			server = info.RepoServer
-		}
-
-		nometa := repo.Project != info.Project ||
-			repo.Repository != info.Repository ||
-			info.isPreInstallImage()
-
-		prpa := genPrpa(repo.Project, repo.Repository, info.Arch)
+		repo := &info.Paths[i]
 
 		got, err := h.binaryManager.get(
-			h.getPkgdir(), server,
-			&binary.ListOpts{
-				CommonOpts: binary.CommonOpts{
-					WorkerId:   h.cfg.Id,
-					Project:    repo.Project,
-					Repository: repo.Repository,
-					Arch:       info.Arch,
-					Modules:    info.Modules,
-					Binaries:   bins.UnsortedList(),
-				},
-				NoMeta: nometa,
-			},
+			h.getPkgdir(), repo, bins.UnsortedList(),
 		)
 		if err != nil {
-
+			utils.LogErr("get binary with cache, err:%v\n", err)
+			continue
 		}
+
+		nometa := info.isRepoNoMeta(repo)
+		prpa := info.getPrpaOfRepo(repo)
 
 		for k, v := range got {
 			done[k] = v.name
+			bins.Delete(k)
+
 			if !nometa && v.hasMeta {
 				imagesWithMeta.Insert(k)
 			}
 
-			bins.Delete(k)
+			if h.handleOutBDep != nil {
+				//TODO
+			}
 
 			if h.handleKiwiOrigin != nil {
 				h.handleKiwiOrigin(k, prpa)

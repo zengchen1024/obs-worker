@@ -63,6 +63,7 @@ func newNonModeBuild(cfg *Config, info *buildinfo.BuildInfo) (*nonModeBuid, erro
 		imageManager:  &b.imageManager,
 		binaryManager: &b.binaryManager,
 
+		handleOutBDep:    b.out.setBdep,
 		handleKiwiOrigin: b.report.setKiwiOrigin,
 
 		handleImage: func(img *preInstallImage) {

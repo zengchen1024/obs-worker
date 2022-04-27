@@ -62,41 +62,43 @@ type cacheManager struct {
 	setCacheScript   string
 }
 
-func (h *cacheManager) init() error {
+func (c *cacheManager) init() error {
 	dir, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 
-	h.perlScriptDir = filepath.Join(dir, "perl")
-	h.parseCacheScript = filepath.Join(h.perlScriptDir, "parse_cache_content.pm")
-	h.setCacheScript = filepath.Join(h.perlScriptDir, "store_cache_content.pm")
+	dir = filepath.Join(dir, "perl")
+
+	c.perlScriptDir = dir
+	c.parseCacheScript = filepath.Join(dir, "parse_cache_content.pm")
+	c.setCacheScript = filepath.Join(dir, "store_cache_content.pm")
 
 	return nil
 }
 
-func (h *cacheManager) getCurrentCacheInfo(cf utils.FileOp) ([]cacheBinInfo, error) {
+func (c *cacheManager) getCurrentCacheInfo(cf utils.FileOp) ([]cacheBinInfo, error) {
 	cache := struct {
 		Content []cacheBinInfo `json:"content"`
 	}{}
 
 	v, err := utils.RunCmd(
 		"perl",
-		"-I", h.perlScriptDir,
-		h.parseCacheScript, h.getCacheDir(),
+		"-I", c.perlScriptDir,
+		c.parseCacheScript, c.getCacheDir(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("%s, %v", v, err)
 	}
 
-	if err = yaml.Unmarshal([]byte(v), &cache); err != nil {
+	if err = yaml.Unmarshal(v, &cache); err != nil {
 		return nil, err
 	}
 
 	return cache.Content, nil
 }
 
-func (h *cacheManager) setCacheInfo(cache []cacheBinInfo) error {
+func (c *cacheManager) setCacheInfo(cache []cacheBinInfo) error {
 	s := make([]string, 0, len(cache))
 	for _, item := range cache {
 		if item.Size > 0 {
@@ -106,8 +108,8 @@ func (h *cacheManager) setCacheInfo(cache []cacheBinInfo) error {
 
 	v, err := utils.RunCmd(
 		"perl",
-		"-I", h.perlScriptDir,
-		h.setCacheScript, h.getCacheDir(), strings.Join(s, "\n"),
+		"-I", c.perlScriptDir,
+		c.setCacheScript, c.getCacheDir(), strings.Join(s, "\n"),
 	)
 	if err != nil {
 		return fmt.Errorf("%s, %v", v, err)
@@ -116,8 +118,8 @@ func (h *cacheManager) setCacheInfo(cache []cacheBinInfo) error {
 	return nil
 }
 
-func (h *cacheManager) addNewCache(caches []cacheBin) ([]cacheBinInfo, error) {
-	cacheDir := h.getCacheDir()
+func (c *cacheManager) addNewCache(caches []cacheBin) ([]cacheBinInfo, error) {
+	cacheDir := c.getCacheDir()
 	r := []cacheBinInfo{}
 
 	for i := len(caches) - 1; i >= 0; i-- {
@@ -166,9 +168,9 @@ func (h *cacheManager) addNewCache(caches []cacheBin) ([]cacheBinInfo, error) {
 	return r, nil
 }
 
-func (h *cacheManager) pruneCache(pruneSize int, oldCache []cacheBinInfo, news []cacheBin) error {
+func (c *cacheManager) pruneCache(pruneSize int, oldCache []cacheBinInfo, news []cacheBin) error {
 	cf, err := utils.LockOpen(
-		filepath.Join(h.getCacheDir(), "content"),
+		filepath.Join(c.getCacheDir(), "content"),
 		os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644,
 	)
 	if err != nil {
@@ -177,12 +179,12 @@ func (h *cacheManager) pruneCache(pruneSize int, oldCache []cacheBinInfo, news [
 
 	defer cf.Close()
 
-	v1, err := h.addNewCache(news)
+	v1, err := c.addNewCache(news)
 	if err != nil {
 		return err
 	}
 
-	v, err := h.getCurrentCacheInfo(cf)
+	v, err := c.getCurrentCacheInfo(cf)
 	if err != nil {
 		return err
 	}
@@ -200,14 +202,14 @@ func (h *cacheManager) pruneCache(pruneSize int, oldCache []cacheBinInfo, news [
 		}
 	}
 
-	cacheDir := h.getCacheDir()
+	cacheDir := c.getCacheDir()
 
 	n := len(caches)
 	for j := i; j < n; j++ {
 		caches[j].remove(cacheDir)
 	}
 
-	if err := h.setCacheInfo(caches[0:i]); err != nil {
+	if err := c.setCacheInfo(caches[0:i]); err != nil {
 		for j := range v1 {
 			caches[j].remove(cacheDir)
 		}
