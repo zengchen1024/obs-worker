@@ -7,6 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/cavaliergopher/rpm"
+
+	"github.com/zengchen1024/obs-worker/utils"
 )
 
 var knownBins = []string{".rpm", ".deb", ".pkg.tar.gz", ".pkg.tar.xz", ".pkg.tar.zst"}
@@ -30,6 +34,16 @@ func isMetaFile(name string) (string, bool) {
 }
 
 func queryHdrmd5(file string) string {
+	v, err := rpm.Open(file)
+	if err != nil {
+		utils.LogErr("get hdrmd5 of rpm file:%s, err:%v\n", file, err)
+		return ""
+	}
+
+	if t := v.Signature.GetTag(0x03ec); t != nil {
+		return fmt.Sprintf("%x", t.Bytes())
+	}
+
 	return ""
 }
 
@@ -136,6 +150,7 @@ func mkdirAll(dir string) error {
 }
 
 func cleanDir(dir string) {
+	// TODO: refactor it
 	d, err := os.ReadDir(dir)
 	if err != nil {
 		return
