@@ -114,6 +114,10 @@ func (b *BuildInfo) getPrpa() string {
 	return genPrpa(b.Project, b.Repository, b.Arch)
 }
 
+func (b *BuildInfo) isNoUnchanged() bool {
+	return buildinfo.IsTrue(b.NoUnchanged)
+}
+
 func getkiwimode(info *buildinfo.BuildInfo) string {
 	re := regexp.MustCompile("^_service:.*:")
 	v := re.ReplaceAllString(info.File, "")

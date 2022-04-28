@@ -10,6 +10,10 @@ func (b *buildReport) setKiwiOrigin(k, v string) {
 		return
 	}
 
+	if b.kiwiOrigins == nil {
+		b.kiwiOrigins = make(map[string][]string)
+	}
+
 	if items, ok := b.kiwiOrigins[k]; ok {
 		b.kiwiOrigins[k] = append(items, v)
 	} else {

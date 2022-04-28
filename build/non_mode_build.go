@@ -21,6 +21,7 @@ type nonModeBuid struct {
 	build         buildPkg
 	sources       buildSources
 	cache         cacheManager
+	oldpkg        buildOldPackages
 
 	needOBSPackage bool
 }
@@ -50,6 +51,11 @@ func newNonModeBuild(cfg *Config, info *buildinfo.BuildInfo) (*nonModeBuid, erro
 	}
 	if err := b.cache.init(); err != nil {
 		return nil, err
+	}
+
+	b.oldpkg = buildOldPackages{
+		buildHelper:           h,
+		handleDownloadDetails: b.stats.setBinaryDownloadDetail,
 	}
 
 	b.binaryManager = binaryManager{
@@ -96,7 +102,12 @@ func (b *nonModeBuid) Do() error {
 		return err
 	}
 
-	// TODO getoldpackages
+	info := b.getBuildInfo()
+	if !info.isNoUnchanged() && info.File != "preinstallimage" {
+		if err := b.oldpkg.download(); err != nil {
+			return err
+		}
+	}
 
 	b.stats.recordDownloadTime()
 
