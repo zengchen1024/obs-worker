@@ -25,11 +25,9 @@ func (s *buildStats) setBinaryDownloadDetail(num, size int) {
 		return
 	}
 
-	s.stats.Download.Binaries = num
-	s.stats.Download.Size = statistic.Size{
-		Unit:  "k",
-		Value: size,
-	}
+	s.stats.Download.Binaries += num
+	s.stats.Download.Size.Unit = "k"
+	s.stats.Download.Size.Value += size
 }
 
 func (s *buildStats) recordDownloadStartTime() {

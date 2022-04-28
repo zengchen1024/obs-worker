@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/zengchen1024/obs-worker/sdk/buildinfo"
 	"github.com/zengchen1024/obs-worker/utils"
 )
 
@@ -49,10 +48,10 @@ func (b *buildPkg) genArgsForOthers(add func(...string)) {
 	add("--clean")
 	add("--changelog")
 
-	oldPkgDir := b.env.oldpkgdir
-	if !buildinfo.IsTrue(info.NoUnchanged) && isFileExist(oldPkgDir) {
+	if oldPkgDir := b.env.oldpkgdir; isFileExist(oldPkgDir) {
 		add("--oldpackages", oldPkgDir)
 	}
+
 	add("--norootforbuild")
 
 	/*
