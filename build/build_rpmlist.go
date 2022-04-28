@@ -56,20 +56,20 @@ func (b *buildRpmlist) generate() error {
 		}
 	}
 
-	img := &b.img
-	// TODO img is empty
-	if s := img.getImageName(); s != "" {
-		rpmList = append(
-			rpmList,
-			fmt.Sprintf("preinstallimage: %s", filepath.Join(pkgdir, s)),
-		)
-	}
+	if img := &b.img; !img.isEmpty() {
+		if s := img.getImageName(); s != "" {
+			rpmList = append(
+				rpmList,
+				fmt.Sprintf("preinstallimage: %s", filepath.Join(pkgdir, s)),
+			)
+		}
 
-	if s := img.getImageSource(); s != "" {
-		rpmList = append(
-			rpmList,
-			fmt.Sprintf("preinstallimagesource: %s", s),
-		)
+		if s := img.getImageSource(); s != "" {
+			rpmList = append(
+				rpmList,
+				fmt.Sprintf("preinstallimagesource: %s", s),
+			)
+		}
 	}
 
 	if s := b.cfg.LocalKiwi; s != "" {

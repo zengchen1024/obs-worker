@@ -37,6 +37,14 @@ func newNonModeBuild(cfg *Config, info *buildinfo.BuildInfo) (*nonModeBuid, erro
 
 	b.sources = buildSources{h}
 
+	b.rpmlist = buildRpmlist{
+		buildHelper: h,
+	}
+
+	b.build = buildPkg{
+		buildHelper: h,
+	}
+
 	b.cache = cacheManager{
 		buildHelper: h,
 	}
@@ -133,15 +141,12 @@ func (b *nonModeBuid) setBuildInfoOut() {
 }
 
 func (b *nonModeBuid) fetchSources() error {
-
-	metas := []string{}
-
 	s, err := b.sources.getSource()
 	if err != nil {
 		return err
 	}
 
-	metas = append(metas, s)
+	metas := []string{s}
 
 	needSSLCert, ignoreImage, _ := b.parseBuildFile()
 
