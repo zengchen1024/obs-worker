@@ -41,7 +41,7 @@ func (env *buildEnv) init(cfg *Config) error {
 
 	cleanDir(env.pkgdir)
 
-	return nil
+	return os.Setenv("BUILD_DIR", filepath.Join(cfg.StateDir, "build"))
 }
 
 func createTmpfs(cfg *Config) error {

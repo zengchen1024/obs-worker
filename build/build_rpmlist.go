@@ -87,12 +87,10 @@ func (b *buildRpmlist) generate() error {
 			}
 		}
 
-		if len(names) > 0 {
-			rpmList = append(
-				rpmList,
-				fmt.Sprintf("%s: %s", item, strings.Join(names, " ")),
-			)
-		}
+		rpmList = append(
+			rpmList,
+			fmt.Sprintf("%s: %s", item, strings.Join(names, " ")),
+		)
 	}
 
 	add("preinstall", func(v *BDep) bool {
@@ -107,7 +105,7 @@ func (b *buildRpmlist) generate() error {
 		return buildinfo.IsTrue(v.RunScripts)
 	})
 
-	if kiwiMode != "" {
+	if kiwiMode == "" {
 		add("noinstall", func(v *BDep) bool {
 			return buildinfo.IsTrue(v.NoInstall)
 		})
@@ -119,7 +117,7 @@ func (b *buildRpmlist) generate() error {
 
 	writeFile(
 		b.env.rpmList,
-		[]byte(strings.Join(append(rpmList, "\n"), "\n")),
+		[]byte(strings.Join(rpmList, "\n")+"\n"),
 	)
 
 	return nil
