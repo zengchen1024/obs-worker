@@ -147,7 +147,7 @@ func (b *nonModeBinary) genMetaData(
 	sort.Strings(bdeps)
 
 	dir := b.getPkgdir()
-	getMeta := func(bdep string) string {
+	getMd5 := func(bdep string) string {
 		if v := imageBins[bdep]; v != "" {
 			return v
 		}
@@ -163,7 +163,7 @@ func (b *nonModeBinary) genMetaData(
 
 	subpacks := b.wrapsSubPacks()
 
-	meta := []string{}
+	meta := []buildMeta{}
 	for _, bdep := range bdeps {
 		if imagesWithMeta.Has(bdep) {
 			f := filepath.Join(dir, bdep+".meta")
@@ -176,13 +176,16 @@ func (b *nonModeBinary) genMetaData(
 			}
 		}
 
-		meta = append(meta, genMetaLine(getMeta(bdep), bdep))
+		meta = append(meta, buildMeta{
+			md5:  getMd5(bdep),
+			path: bdep,
+		})
 	}
 
-	return b.genMeta(meta, subpacks), nil
+	return genMeta(meta, subpacks, info.GenMetaAlgo), nil
 }
 
-func (b *nonModeBinary) parseMetaFile(dep, file, currentPkg string, subpacks sets.String) ([]string, error) {
+func (b *nonModeBinary) parseMetaFile(dep, file, currentPkg string, subpacks sets.String) ([]buildMeta, error) {
 	if v, err := isEmptyFile(file); v || err != nil {
 		return nil, err
 	}
@@ -191,7 +194,14 @@ func (b *nonModeBinary) parseMetaFile(dep, file, currentPkg string, subpacks set
 	seen := sets.NewString()
 	firstLine := true
 
-	meta := []string{}
+	meta := []buildMeta{}
+	add := func(md5, path string) {
+		meta = append(meta, buildMeta{
+			md5:  md5,
+			path: path,
+		})
+	}
+
 	handle := func(line string) bool {
 		line = strings.TrimRight(line, "\n") // need it?
 		md5, pkg := splitMetaLine(line)
@@ -201,7 +211,7 @@ func (b *nonModeBinary) parseMetaFile(dep, file, currentPkg string, subpacks set
 				return true
 			}
 
-			meta = append(meta, genMetaLine(md5, dep))
+			add(md5, dep)
 
 			firstLine = false
 			return false
@@ -217,7 +227,7 @@ func (b *nonModeBinary) parseMetaFile(dep, file, currentPkg string, subpacks set
 			}
 		}
 
-		meta = append(meta, genMetaLine(md5, fmt.Sprintf("%s/%s", dep, pkg)))
+		add(md5, fmt.Sprintf("%s/%s", dep, pkg))
 
 		return false
 	}
@@ -227,31 +237,9 @@ func (b *nonModeBinary) parseMetaFile(dep, file, currentPkg string, subpacks set
 	return meta, err
 }
 
-func (b *nonModeBinary) genMeta(deps []string, subpacks sets.String) []string {
-	subpackPath := sets.NewString()
-	cycle := sets.NewString()
-
-	for _, line := range deps {
-		_, pkg := splitMetaLine(line)
-
-		if a := wrapsEachPkg(pkg, true); subpacks.HasAny(a...) {
-			subpackPath.Insert(pkg)
-
-			if !subpacks.Has(a[0]) {
-				cycle.Insert(a[0])
-			}
-		}
-	}
-
-	helper := &metaHelper{
-		deps, subpackPath, cycle,
-	}
-
-	return helper.genMeta(b.getBuildInfo().GenMetaAlgo)
-}
-
 func (b *nonModeBinary) wrapsSubPacks() sets.String {
 	v := sets.NewString()
+
 	for _, item := range b.getBuildInfo().SubPacks {
 		v.Insert(fmt.Sprintf("/%s/", item))
 	}
