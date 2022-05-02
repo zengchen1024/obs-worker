@@ -161,14 +161,27 @@ func (b *nonModeBinary) genMetaData(
 		return "deaddeaddeaddeaddeaddeaddeaddead"
 	}
 
-	subpacks := b.wrapsSubPacks()
+	subpacks := make([]string, len(info.SubPacks))
+	for i, s := range info.SubPacks {
+		subpacks[i] = fmt.Sprintf("/%s/", s)
+	}
+
+	isSubpack := func(p string) bool {
+		for _, k := range subpacks {
+			if strings.Contains(p, k) {
+				return true
+			}
+		}
+
+		return false
+	}
 
 	meta := []buildMeta{}
 	for _, bdep := range bdeps {
 		if imagesWithMeta.Has(bdep) {
 			f := filepath.Join(dir, bdep+".meta")
 
-			m, err := b.parseMetaFile(bdep, f, info.Package, subpacks)
+			m, err := b.parseMetaFile(bdep, f, info.Package, isSubpack)
 			if err == nil {
 				meta = append(meta, m...)
 
@@ -182,15 +195,15 @@ func (b *nonModeBinary) genMetaData(
 		})
 	}
 
-	return genMeta(meta, subpacks, info.GenMetaAlgo), nil
+	return genMeta(meta, info.SubPacks, info.GenMetaAlgo), nil
 }
 
-func (b *nonModeBinary) parseMetaFile(dep, file, currentPkg string, subpacks sets.String) ([]buildMeta, error) {
+func (b *nonModeBinary) parseMetaFile(dep, file, currentPkg string, isSubpack func(string) bool) ([]buildMeta, error) {
 	if v, err := isEmptyFile(file); v || err != nil {
 		return nil, err
 	}
 
-	isNotSubpack := !subpacks.Has(fmt.Sprintf("/%s/", dep))
+	isNotSubpack := !isSubpack(fmt.Sprintf("/%s/", dep))
 	seen := sets.NewString()
 	firstLine := true
 
@@ -218,12 +231,12 @@ func (b *nonModeBinary) parseMetaFile(dep, file, currentPkg string, subpacks set
 		}
 
 		if isNotSubpack {
-			if seen.Has(line) {
+			if seen.Has(pkg) {
 				return false
 			}
 
-			if a := wrapsEachPkg(pkg, false); !subpacks.HasAny(a...) {
-				seen.Insert(line)
+			if !isSubpack(pkg + "/") {
+				seen.Insert(pkg)
 			}
 		}
 
@@ -235,32 +248,4 @@ func (b *nonModeBinary) parseMetaFile(dep, file, currentPkg string, subpacks set
 	err := readFileLineByLine(file, handle)
 
 	return meta, err
-}
-
-func (b *nonModeBinary) wrapsSubPacks() sets.String {
-	v := sets.NewString()
-
-	for _, item := range b.getBuildInfo().SubPacks {
-		v.Insert(fmt.Sprintf("/%s/", item))
-	}
-
-	return v
-}
-
-func wrapsEachPkg(pkgPath string, full bool) []string {
-	items := strings.Split(pkgPath, "/")
-
-	n := len(items)
-	a := make([]string, n)
-	for i := 1; i < n; i++ {
-		a[i] = fmt.Sprintf("/%s/", items[i])
-	}
-
-	if full {
-		a[0] = fmt.Sprintf("/%s/", items[0])
-	} else {
-		a[0] = fmt.Sprintf("%s/", items[0])
-	}
-
-	return a
 }
