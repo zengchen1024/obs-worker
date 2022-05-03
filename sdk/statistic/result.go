@@ -13,6 +13,10 @@ type BuildStatistics struct {
 	Download Download `xml:"download"`
 }
 
+func (s *BuildStatistics) Marshal() ([]byte, error) {
+	return xml.Marshal(s)
+}
+
 type Disk struct {
 	XMLName xml.Name `xml:"disk"`
 
@@ -81,8 +85,4 @@ func (s *Size) IsEmpty() bool {
 func Extract(input []byte) (r BuildStatistics, err error) {
 	err = xml.Unmarshal(input, &r)
 	return
-}
-
-func Mashal(s *BuildStatistics) ([]byte, error) {
-	return xml.Marshal(s)
 }

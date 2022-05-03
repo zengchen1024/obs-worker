@@ -45,6 +45,10 @@ type BuildInfo struct {
 	FollowupFile string `xml:"followupfile"`
 }
 
+func (b *BuildInfo) Marshal() ([]byte, error) {
+	return xml.Marshal(b)
+}
+
 type BDep struct {
 	XMLName xml.Name `xml:"bdep"`
 

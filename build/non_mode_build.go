@@ -123,11 +123,13 @@ func (b *nonModeBuid) Do() error {
 		return err
 	}
 
-	b.stats.do()
+	dir := b.env.otherDir
 
-	b.out.writeBuildEnv()
+	b.stats.do(dir)
 
-	b.report.do()
+	b.out.writeBuildEnv(dir)
+
+	b.report.do(dir)
 
 	return nil
 }
