@@ -1,6 +1,9 @@
 package build
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/zengchen1024/obs-worker/sdk/statistic"
@@ -9,6 +12,7 @@ import (
 type buildStats struct {
 	stats statistic.BuildStatistics
 
+	startTime         int
 	downloadStartTime int
 }
 
@@ -41,6 +45,20 @@ func (s *buildStats) recordDownloadTime() {
 	}
 }
 
-func (s *buildStats) do() {
+func (s *buildStats) recordStartTime() {
+	s.startTime = int(time.Now().Unix())
+}
 
+func (s *buildStats) do(dir string) {
+	s.stats.Times.Total = statistic.Time{
+		Unit:  "s",
+		Value: int(time.Now().Unix()) - s.startTime,
+	}
+
+	if b, err := s.stats.Marshal(); err == nil {
+		tmp := filepath.Join(dir, "_statistics.new")
+		if nil == writeFile(tmp, b) {
+			os.Rename(tmp, strings.TrimSuffix(tmp, ".new"))
+		}
+	}
 }

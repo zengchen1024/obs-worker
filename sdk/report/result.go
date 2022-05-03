@@ -18,6 +18,10 @@ type Report struct {
 	Binaries   []Binary `xml:"binary"`
 }
 
+func (r *Report) Marshal() ([]byte, error) {
+	return xml.Marshal(r)
+}
+
 type Binary struct {
 	XMLName xml.Name `xml:"binary"`
 
@@ -40,8 +44,4 @@ type Binary struct {
 func Extract(input []byte) (r Report, err error) {
 	err = xml.Unmarshal(input, &r)
 	return
-}
-
-func Mashal(s *Report) ([]byte, error) {
-	return xml.Marshal(s)
 }

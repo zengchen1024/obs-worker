@@ -15,6 +15,7 @@ type buildEnv struct {
 	config    string
 	rpmList   string
 	logFile   string
+	otherDir  string
 }
 
 func (env *buildEnv) init(cfg *Config) error {
@@ -33,6 +34,7 @@ func (env *buildEnv) init(cfg *Config) error {
 	env.packages = filepath.Join(buildroot, ".build.packages")
 	env.mountDir = filepath.Join(buildroot, ".mount")
 	env.oldpkgdir = filepath.Join(buildroot, ".build.oldpackages")
+	env.otherDir = filepath.Join(buildroot, ".build.packages", "OTHER")
 
 	os.Remove(env.meta)
 	os.RemoveAll(env.srcdir)
@@ -40,6 +42,13 @@ func (env *buildEnv) init(cfg *Config) error {
 	os.RemoveAll(env.packages)
 
 	cleanDir(env.pkgdir)
+
+	dir := env.otherDir
+	if !isFileExist(dir) {
+		if err := mkdir(dir); err != nil {
+			return err
+		}
+	}
 
 	return os.Setenv("BUILD_DIR", filepath.Join(cfg.StateDir, "build"))
 }
