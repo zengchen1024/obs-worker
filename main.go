@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	beego "github.com/beego/beego/v2/server/web"
+	"github.com/astaxie/beego"
 	"github.com/opensourceways/community-robot-lib/interrupts"
 
 	"github.com/zengchen1024/obs-worker/config"
@@ -16,11 +16,7 @@ import (
 )
 
 func main() {
-	p, err := beego.AppConfig.String("build_config")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	p := beego.AppConfig.String("build_config")
 
 	cfg, err := config.Load(p)
 	if err != nil {

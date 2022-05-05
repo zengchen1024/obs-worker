@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	beego "github.com/beego/beego/v2/server/web"
+	"github.com/astaxie/beego"
 
 	"github.com/zengchen1024/obs-worker/sdk/opstatus"
 	"github.com/zengchen1024/obs-worker/utils"
@@ -39,7 +39,7 @@ func (c *MainController) Get() {
 	c.sendResponse("hello perl", 0)
 }
 
-// @router /build [put]
+// @router / [put]
 func (c *MainController) NewJob() {
 	body := c.Ctx.Input.RequestBody
 
