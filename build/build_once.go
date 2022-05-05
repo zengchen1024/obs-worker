@@ -8,6 +8,10 @@ import (
 
 type Build interface {
 	Do() error
+	GetBuildInfo() *buildinfo.BuildInfo
+	Kill()
+	SetSysrq()
+	AppenBuildLog(string)
 }
 
 func NewBuild(cfg *Config, info *buildinfo.BuildInfo) (Build, error) {
