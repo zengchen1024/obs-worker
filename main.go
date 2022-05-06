@@ -1,62 +1,45 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"time"
+	"net/http"
+	"strconv"
 
-	"github.com/astaxie/beego"
 	"github.com/opensourceways/community-robot-lib/interrupts"
 
 	"github.com/zengchen1024/obs-worker/config"
-	_ "github.com/zengchen1024/obs-worker/routers"
+	"github.com/zengchen1024/obs-worker/controllers"
 	"github.com/zengchen1024/obs-worker/utils"
 	"github.com/zengchen1024/obs-worker/worker"
 )
 
 func main() {
-	p := beego.AppConfig.String("build_config")
-
-	cfg, err := config.Load(p)
+	cfg, err := config.Load("./conf/build_config.yaml")
 	if err != nil {
 		utils.LogErr("load config failed, err:%v\n", err)
 		return
 	}
 
-	port, err := beego.AppConfig.Int("httpport")
-	if err != nil || port == 0 {
-		utils.LogErr("must set http port")
-		os.Exit(0)
-	}
-
-	if err := worker.Init(&cfg.Build, port); err != nil {
+	if err := worker.Init(&cfg.Build, 8080); err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	defer worker.Exit()
 
-	run()
+	run(8080)
 }
 
-func run() {
+func run(port int) {
 	defer interrupts.WaitForGracefulShutdown()
 
-	interrupts.OnInterrupt(func() {
-		shutdown()
-	})
+	register()
 
-	beego.Run()
+	httpServer := &http.Server{Addr: ":" + strconv.Itoa(port)}
+
+	interrupts.ListenAndServe(httpServer, 300)
 }
 
-func shutdown() {
-	utils.LogInfo("server shutting down...")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	if err := beego.BeeApp.Server.Shutdown(ctx); err != nil {
-		utils.LogErr("error to shut down server, err:%v", err.Error())
-	}
-
-	cancel()
+func register() {
+	http.Handle("/build", controllers.BuildController{})
 }
