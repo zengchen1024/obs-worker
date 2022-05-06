@@ -1,43 +1,77 @@
 package main
 
 import (
-	"fmt"
+	"flag"
 	"net/http"
+	"os"
 	"strconv"
+	"time"
 
 	"github.com/opensourceways/community-robot-lib/interrupts"
+	"github.com/opensourceways/community-robot-lib/logrusutil"
+	"github.com/sirupsen/logrus"
 
 	"github.com/zengchen1024/obs-worker/config"
 	"github.com/zengchen1024/obs-worker/controllers"
-	"github.com/zengchen1024/obs-worker/utils"
 	"github.com/zengchen1024/obs-worker/worker"
 )
 
+type options struct {
+	config      string
+	port        int
+	gracePeriod time.Duration
+}
+
+func gatherOptions(fs *flag.FlagSet, args ...string) options {
+	var o options
+
+	fs.StringVar(
+		&o.config, "config", "./conf/build_config.yaml",
+		"Path to the config file.",
+	)
+
+	fs.IntVar(&o.port, "port", 8080, "http server port")
+
+	fs.DurationVar(
+		&o.gracePeriod, "grace-period", 180*time.Second,
+		"On shutdown, try to handle remaining events for the specified duration.",
+	)
+
+	fs.Parse(args)
+
+	return o
+}
+
 func main() {
-	cfg, err := config.Load("./conf/build_config.yaml")
+	logrusutil.ComponentInit("obs-worker")
+
+	o := gatherOptions(
+		flag.NewFlagSet(os.Args[0], flag.ExitOnError),
+		os.Args[1:]...,
+	)
+
+	cfg, err := config.Load(o.config)
 	if err != nil {
-		utils.LogErr("load config failed, err:%v\n", err)
-		return
+		logrus.WithError(err).Fatal("load config failed")
 	}
 
-	if err := worker.Init(&cfg.Build, 8080); err != nil {
-		fmt.Println(err)
-		return
+	if err := worker.Init(&cfg.Build, o.port); err != nil {
+		logrus.WithError(err).Fatal("init worker")
 	}
 
 	defer worker.Exit()
 
-	run(8080)
+	run(&o)
 }
 
-func run(port int) {
+func run(o *options) {
 	defer interrupts.WaitForGracefulShutdown()
 
 	register()
 
-	httpServer := &http.Server{Addr: ":" + strconv.Itoa(port)}
+	httpServer := &http.Server{Addr: ":" + strconv.Itoa(o.port)}
 
-	interrupts.ListenAndServe(httpServer, 300)
+	interrupts.ListenAndServe(httpServer, o.gracePeriod)
 }
 
 func register() {
