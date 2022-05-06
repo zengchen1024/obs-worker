@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/astaxie/beego/logs"
+	"github.com/sirupsen/logrus"
 )
 
 func GenMD5(b []byte) string {
@@ -23,11 +23,11 @@ func GenMd5OfFile(f string) (string, error) {
 }
 
 func LogInfo(f string, v ...interface{}) {
-	logs.Info(fmt.Sprintf(f, v...))
+	logrus.Infof(f, v...)
 }
 
 func LogErr(f string, v ...interface{}) {
-	logs.Error(fmt.Sprintf(f, v...))
+	logrus.Errorf(f, v...)
 }
 
 func ReadFileLineByLine(filename string, handle func(string) bool) error {

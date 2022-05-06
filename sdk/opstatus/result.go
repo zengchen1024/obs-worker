@@ -12,7 +12,6 @@ type Status struct {
 	Details string `xml:"details"`
 }
 
-func (s *Status) Marshal() (string, error) {
-	v, err := xml.Marshal(s)
-	return string(v), err
+func (s *Status) Marshal() ([]byte, error) {
+	return xml.Marshal(s)
 }

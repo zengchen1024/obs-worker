@@ -55,7 +55,7 @@ func Create(hc *utils.HttpClient, endpoint string, opts *QueryOpts, w *Worker) (
 		return
 	}
 
-	data, err := w.marshal()
+	data, err := w.Marshal()
 	if err != nil {
 		return
 	}

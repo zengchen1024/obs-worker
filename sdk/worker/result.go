@@ -53,6 +53,6 @@ type CPU struct {
 	Flag []string `xml:"flag"`
 }
 
-func (w *Worker) marshal() ([]byte, error) {
+func (w *Worker) Marshal() ([]byte, error) {
 	return xml.Marshal(w)
 }
