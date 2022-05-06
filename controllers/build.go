@@ -16,8 +16,7 @@ type baseController struct{}
 func (c baseController) reply(w http.ResponseWriter, s opstatus.Status) {
 	data := []string{""}
 
-	code := s.Code
-	if code != 0 {
+	if code := s.Code; code != 0 {
 		data[0] = fmt.Sprintf("HTTP/1.1 %d Error", code)
 	} else {
 		s.Code = 200
@@ -39,9 +38,7 @@ func (c baseController) reply(w http.ResponseWriter, s opstatus.Status) {
 		)
 	}
 
-	if code != 0 {
-		w.WriteHeader(code)
-	}
+	w.WriteHeader(s.Code)
 
 	fmt.Fprint(w, strings.Join(data, separator))
 }
@@ -53,7 +50,7 @@ type BuildController struct {
 func (b BuildController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	job := worker.Job{}
 
-	jobId, err := b.extract(r, &job)
+	jobId, err := b.extract(w, r, &job)
 	if err != nil {
 		b.reply(w, opstatus.Status{
 			Code:    400,
@@ -96,7 +93,15 @@ func (b BuildController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (b BuildController) extract(r *http.Request, job *worker.Job) (string, error) {
+func (b BuildController) extract(
+	w http.ResponseWriter,
+	r *http.Request,
+	job *worker.Job,
+) (string, error) {
+	if v := r.Header.Get("expect"); strings.ToLower(v) == "100-continue" {
+		fmt.Fprint(w, "HTTP/1.1 100 continue\r\n\r\n")
+	}
+
 	v := r.Header.Get("Content-Length")
 	n, err := strconv.Atoi(v)
 	if err != nil {
