@@ -221,3 +221,11 @@ func (b *nonModeBuid) parseBuildFile() (
 	}
 	return
 }
+
+func (b *nonModeBuid) GetBuildInfo() *buildinfo.BuildInfo {
+	return &b.info.BuildInfo
+}
+
+func (b *nonModeBuid) Kill()                  {}
+func (b *nonModeBuid) SetSysrq()              {}
+func (b *nonModeBuid) AppenBuildLog(s string) {}

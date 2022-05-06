@@ -10,7 +10,7 @@ import (
 	"github.com/zengchen1024/obs-worker/utils"
 )
 
-func (b *buildManager) sendIdleState() {
+func (b *BuildManager) sendIdleState() {
 	state := "idle"
 
 	opts := worker.QueryOpts{
@@ -31,7 +31,7 @@ func (b *buildManager) sendIdleState() {
 	}
 }
 
-func (b *buildManager) sendExitState() {
+func (b *BuildManager) sendExitState() {
 	state := "exit"
 
 	opts := worker.QueryOpts{
@@ -48,7 +48,7 @@ func (b *buildManager) sendExitState() {
 	}
 }
 
-func (b *buildManager) getWorkerInfo() error {
+func (b *BuildManager) getWorkerInfo() error {
 	cfg := b.cfg
 
 	info := &b.w
@@ -72,7 +72,7 @@ func (b *buildManager) getWorkerInfo() error {
 	return nil
 }
 
-func (b *buildManager) getLinuxVersion(w *worker.Worker) error {
+func (b *BuildManager) getLinuxVersion(w *worker.Worker) error {
 	bs, err := os.ReadFile("/proc/version")
 	if err != nil {
 		return err
@@ -90,7 +90,7 @@ func (b *buildManager) getLinuxVersion(w *worker.Worker) error {
 	return nil
 }
 
-func (b *buildManager) getWorkerCPUInfo(w *worker.Worker) {
+func (b *BuildManager) getWorkerCPUInfo(w *worker.Worker) {
 	implementer := ""
 	variant := ""
 	processor := 0
@@ -168,7 +168,7 @@ func (b *buildManager) getWorkerCPUInfo(w *worker.Worker) {
 	}
 }
 
-func (b *buildManager) getWorkerHardware(w *worker.Worker) {
+func (b *BuildManager) getWorkerHardware(w *worker.Worker) {
 	vm := b.cfg.GetVMInfo()
 	if vm == nil {
 		return

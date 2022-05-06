@@ -87,7 +87,6 @@ type Path struct {
 	URL        string `xml:"URL,ATTR"`
 }
 
-func Extract(input []byte) (r BuildInfo, err error) {
-	err = xml.Unmarshal(input, &r)
-	return
+func (r *BuildInfo) Extract(input []byte) error {
+	return xml.Unmarshal(input, r)
 }

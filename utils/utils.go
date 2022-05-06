@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/beego/beego/v2/core/logs"
+	"github.com/astaxie/beego/logs"
 )
 
 func GenMD5(b []byte) string {
