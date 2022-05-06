@@ -75,5 +75,13 @@ func run(o *options) {
 }
 
 func register() {
-	http.Handle("/build", controllers.BuildController{})
+	c := controllers.BuildController{}
+
+	http.HandleFunc("/build", c.Build)
+	http.HandleFunc("/info", c.JobInfo)
+	http.HandleFunc("/worker", c.WorkerInfo)
+	http.HandleFunc("/kill", c.KillJob)
+	http.HandleFunc("/discard", c.DiscardJob)
+	http.HandleFunc("/badhost", c.SetBadHostJob)
+	http.HandleFunc("/sysrq", c.SetSysrqJob)
 }

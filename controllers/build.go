@@ -11,15 +11,32 @@ import (
 	"github.com/zengchen1024/obs-worker/worker"
 )
 
+const separator = "\r\n"
+
+type result interface {
+	Marshal() ([]byte, error)
+}
+
 type baseController struct{}
 
-func (c baseController) reply(w http.ResponseWriter, s opstatus.Status) {
+func (c baseController) replyMsg(w http.ResponseWriter, code int, s string) {
+	if code == 0 {
+		code = 200
+	}
+
+	c.reply(w, code, &opstatus.Status{
+		Code:    code,
+		Details: s,
+	})
+}
+
+func (c baseController) reply(w http.ResponseWriter, code int, r result) {
 	data := []string{""}
 
-	if code := s.Code; code != 0 {
+	if code > 300 || code < 200 {
 		data[0] = fmt.Sprintf("HTTP/1.1 %d Error", code)
 	} else {
-		s.Code = 200
+		code = 200
 		data[0] = "HTTP/1.1 200 OK"
 	}
 
@@ -30,41 +47,42 @@ func (c baseController) reply(w http.ResponseWriter, s opstatus.Status) {
 		"Connection: close",
 	)
 
-	if v, err := s.Marshal(); err == nil {
+	v, err := r.Marshal()
+	if err == nil {
 		data = append(
 			data,
 			fmt.Sprintf("Content-Length: %d", len(v)),
-			separator+v,
+			separator,
 		)
 	}
 
-	w.WriteHeader(s.Code)
+	w.WriteHeader(code)
 
-	fmt.Fprint(w, strings.Join(data, separator))
+	fmt.Fprint(w, strings.Join(data, separator), v)
 }
 
 type BuildController struct {
 	baseController
 }
 
-func (b BuildController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (b BuildController) Build(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		b.replyMsg(w, 405, "method is not allowed")
+
+		return
+	}
+
 	job := worker.Job{}
 
 	jobId, err := b.extract(w, r, &job)
 	if err != nil {
-		b.reply(w, opstatus.Status{
-			Code:    400,
-			Details: err.Error(),
-		})
+		b.replyMsg(w, 400, err.Error())
 
 		return
 	}
 
 	if err := job.Validate(); err != nil {
-		b.reply(w, opstatus.Status{
-			Code:    400,
-			Details: err.Error(),
-		})
+		b.replyMsg(w, 400, err.Error())
 
 		return
 	}
@@ -80,17 +98,12 @@ func (b BuildController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	job.Id = jobId
 
 	if err = job.Create(q.Get("registerserver")); err != nil {
-		b.reply(w, opstatus.Status{
-			Code:    500,
-			Details: err.Error(),
-		})
+		b.replyMsg(w, 500, err.Error())
 
 		return
 	}
 
-	b.reply(w, opstatus.Status{
-		Details: "so much work, so little time...",
-	})
+	b.replyMsg(w, 0, "so much work, so little time...")
 }
 
 func (b BuildController) extract(

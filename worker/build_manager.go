@@ -93,7 +93,7 @@ func (b *BuildManager) GetWorkerInfo(jobid string) (worker.Worker, error) {
 	return w, nil
 }
 
-func (b *BuildManager) SetSysrq(jobid string) error {
+func (b *BuildManager) SetSysrqJob(jobid string) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
