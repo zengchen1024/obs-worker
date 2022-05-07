@@ -2,10 +2,10 @@ package utils
 
 import "os/exec"
 
-func RunCmd(args ...string) ([]byte, error) {
+func RunCmd(args ...string) ([]byte, error, int) {
 	n := len(args)
 	if n == 0 {
-		return nil, nil
+		return nil, nil, 0
 	}
 
 	cmd := args[0]
@@ -17,5 +17,14 @@ func RunCmd(args ...string) ([]byte, error) {
 	}
 
 	c := exec.Command(cmd, args...)
-	return c.CombinedOutput()
+	out, err := c.CombinedOutput()
+	if err == nil {
+		return out, nil, 0
+	}
+
+	if e, ok := err.(*exec.ExitError); ok {
+		return out, err, e.ExitCode()
+	}
+
+	return out, err, -1
 }

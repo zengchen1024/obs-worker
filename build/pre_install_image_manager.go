@@ -330,7 +330,7 @@ func (h *preInstallImageManager) downloadImage(img *imageInfo) bool {
 	// manage_cache
 	data := img.genCacheMeta()
 	tmp := ifile + ".meta"
-	if nil == writeFile(tmp, []byte(data)) {
+	if nil == utils.WriteFile(tmp, []byte(data)) {
 		h.cache.pruneCache(
 			h.getCacheSize(), nil,
 			[]cacheBin{

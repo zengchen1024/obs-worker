@@ -13,6 +13,7 @@ type Build interface {
 	SetSysrq()
 	AppenBuildLog(string)
 	GetBuildLogFile() string
+	CanDo() error
 }
 
 func NewBuild(cfg *Config, info *buildinfo.BuildInfo) (Build, error) {

@@ -9,7 +9,7 @@ type WorkerState struct {
 
 	State        string `xml:"state"`
 	Nextstate    string `xml:"nextstate"`
-	Jobid        string `xml:"jobid"`
+	JobId        string `xml:"jobid"`
 	Pid          string `xml:"pid"`
 	Logsizelimit string `xml:"logsizelimit"`
 	Logidlelimit string `xml:"logidlelimit"`

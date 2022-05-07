@@ -2,6 +2,8 @@ package build
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/zengchen1024/obs-worker/sdk/config"
@@ -61,6 +63,37 @@ func (b *buildHelper) downloadProjectConfig() error {
 		},
 		b.env.config,
 	)
+}
+
+func (b *buildHelper) CanDo() error {
+	if b.cfg.HostCheck != "" {
+		f := filepath.Join(b.cfg.StateDir, "job")
+
+		_, err, code := utils.RunCmd(
+			b.cfg.HostCheck,
+			"--srcserver", b.getSrcServer(),
+			f, "precheck", b.cfg.BuildRoot,
+		)
+
+		if err != nil {
+			os.Remove(f)
+
+			if code > 0 {
+				switch code >> 8 {
+				case 3:
+					err = fmt.Errorf("cannot build anything")
+				case 2:
+					err = fmt.Errorf("cannot build this repository")
+				default:
+					err = fmt.Errorf("cannot build this package")
+				}
+			}
+
+			return err
+		}
+	}
+
+	return nil
 }
 
 func genPrpa(proj, repo, arch string) string {

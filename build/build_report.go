@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/zengchen1024/obs-worker/sdk/report"
+	"github.com/zengchen1024/obs-worker/utils"
 )
 
 type buildReport struct {
@@ -65,7 +66,7 @@ func (b *buildReport) do(dir string) {
 			name = strings.Replace(name, ".packages", ".report", 1)
 
 			tmp := filepath.Join(filepath.Dir(path), name+".new")
-			if nil == writeFile(tmp, o) {
+			if nil == utils.WriteFile(tmp, o) {
 				os.Rename(tmp, strings.TrimSuffix(tmp, ".new"))
 			}
 		}

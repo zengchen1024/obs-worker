@@ -18,7 +18,7 @@ type buildPkg struct {
 func (b *buildPkg) do() error {
 	v := b.genArgs()
 
-	out, err := utils.RunCmd(v...)
+	out, err, _ := utils.RunCmd(v...)
 	if err != nil {
 		return fmt.Errorf("%s, %v", out, err)
 	}

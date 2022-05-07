@@ -82,7 +82,7 @@ func (c *cacheManager) getCurrentCacheInfo(cf utils.FileOp) ([]cacheBinInfo, err
 		Content []cacheBinInfo `json:"content"`
 	}{}
 
-	v, err := utils.RunCmd(
+	v, err, _ := utils.RunCmd(
 		"perl",
 		"-I", c.perlScriptDir,
 		c.parseCacheScript, c.getCacheDir(),
@@ -106,7 +106,7 @@ func (c *cacheManager) setCacheInfo(cache []cacheBinInfo) error {
 		}
 	}
 
-	v, err := utils.RunCmd(
+	v, err, _ := utils.RunCmd(
 		"perl",
 		"-I", c.perlScriptDir,
 		c.setCacheScript, c.getCacheDir(), strings.Join(s, "\n"),

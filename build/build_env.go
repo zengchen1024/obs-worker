@@ -3,6 +3,8 @@ package build
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/zengchen1024/obs-worker/utils"
 )
 
 type buildEnv struct {
@@ -36,15 +38,24 @@ func (env *buildEnv) init(cfg *Config) error {
 	env.oldpkgdir = filepath.Join(buildroot, ".build.oldpackages")
 	env.otherDir = filepath.Join(buildroot, ".build.packages", "OTHER")
 
+	if !isFileExist(buildroot) {
+		if err := mkdir(buildroot); err != nil {
+			return err
+		}
+	}
+
 	os.Remove(env.meta)
+	os.Remove(env.packages)
+
+	os.Remove(env.logFile)
+	utils.WriteFile(env.logFile, nil)
+
 	os.RemoveAll(env.srcdir)
 	os.RemoveAll(env.oldpkgdir)
-	os.RemoveAll(env.packages)
 
 	cleanDir(env.pkgdir)
 
-	dir := env.otherDir
-	if !isFileExist(dir) {
+	if dir := env.otherDir; !isFileExist(dir) {
 		if err := mkdir(dir); err != nil {
 			return err
 		}

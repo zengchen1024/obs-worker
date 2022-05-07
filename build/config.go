@@ -158,7 +158,7 @@ type Config struct {
 
 func (c *Config) SetDefault() error {
 	if c.HostArch == "" {
-		out, err := utils.RunCmd("uname", "-m")
+		out, err, _ := utils.RunCmd("uname", "-m")
 		if err != nil {
 			return fmt.Errorf("get host arch failed, err: %v, %v", string(out), err)
 		}

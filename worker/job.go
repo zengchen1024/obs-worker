@@ -6,7 +6,7 @@ import (
 
 type Job struct {
 	Id        string
-	NoBadHost int
+	NoBadHost string
 
 	buildinfo.BuildInfo
 }
@@ -16,8 +16,21 @@ func (j *Job) Validate() error {
 }
 
 func (j *Job) Create(registerServer string) error {
-	// init buildinfo
+	if len(j.Paths) > 0 {
+		p := j.Paths[0]
 
-	return nil
-	// return instance.createJob(registerServer, &j.BuildInfo)
+		if j.Project == "" {
+			j.Project = p.Project
+		}
+
+		if j.Repository == "" {
+			j.Repository = p.Repository
+		}
+
+		if j.RepoServer == "" {
+			j.RepoServer = p.Server
+		}
+	}
+
+	return instance.createJob(registerServer, j)
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/zengchen1024/obs-worker/sdk/buildinfo"
+	"github.com/zengchen1024/obs-worker/utils"
 )
 
 type nonModeBuid struct {
@@ -179,7 +180,7 @@ func (b *nonModeBuid) fetchSources() error {
 	}
 	metas = append(metas, v...)
 
-	return writeFile(b.env.meta, []byte(strings.Join(metas, "\n")+"\n"))
+	return utils.WriteFile(b.env.meta, []byte(strings.Join(metas, "\n")+"\n"))
 }
 
 func (b *nonModeBuid) parseBuildFile() (

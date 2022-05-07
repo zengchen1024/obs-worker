@@ -3,7 +3,6 @@ package filereceiver
 import (
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 
@@ -103,7 +102,7 @@ func (r *cpioReceiver) do() ([]CPIOFileMeta, error) {
 		}
 
 		if saveTo != "" {
-			err = os.WriteFile(saveTo, file, 0644)
+			err = utils.WriteFile(saveTo, file)
 			if err != nil {
 				return nil, err
 			}

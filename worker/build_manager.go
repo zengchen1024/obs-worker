@@ -2,6 +2,7 @@ package worker
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -24,9 +25,11 @@ type BuildManager struct {
 	w    worker.Worker
 	port int
 
-	state workerstate.WorkerState
-	job   build.Build
 	lock  sync.RWMutex
+	state workerstate.WorkerState
+
+	job       build.Build
+	nobadhost string
 }
 
 func (b *BuildManager) canBuild(info *buildinfo.BuildInfo) error {
@@ -45,13 +48,32 @@ func (b *BuildManager) canBuild(info *buildinfo.BuildInfo) error {
 	return nil
 }
 
-func (b *BuildManager) createJob(registerServer string, info *buildinfo.BuildInfo) error {
+func (b *BuildManager) createJob(registerServer string, j *Job) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
 	if b.state.State != "idle" {
 		return fmt.Errorf("I am not idle!\n")
 	}
+
+	v, _ := j.Marshal()
+	err := utils.WriteFile(filepath.Join(b.cfg.StateDir, "job"), v)
+	if err != nil {
+		return err
+	}
+
+	job, err := build.NewBuild(b.cfg, &j.BuildInfo)
+	if err != nil {
+		return err
+	}
+
+	if err := job.CanDo(); err != nil {
+		return err
+	}
+
+	b.job = job
+	b.state.JobId = j.Id
+	b.nobadhost = j.NoBadHost
 
 	return nil
 }
@@ -152,7 +174,7 @@ func (b *BuildManager) checkWorkerState(jobid string, needBuilding bool) error {
 		return fmt.Errorf("not building a job")
 	}
 
-	if jobid != "" && jobid != b.state.Jobid {
+	if jobid != "" && jobid != b.state.JobId {
 		return fmt.Errorf("building a different job")
 	}
 

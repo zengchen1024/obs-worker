@@ -119,7 +119,7 @@ func (h *buildSources) downloadSSLCert() error {
 		return err
 	}
 
-	return writeFile(
+	return utils.WriteFile(
 		filepath.Join(h.getSrcdir(), "_projectcert.crt"),
 		v,
 	)
