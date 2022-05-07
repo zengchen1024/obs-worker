@@ -7,44 +7,57 @@ import (
 	"strings"
 
 	"github.com/zengchen1024/obs-worker/sdk/worker"
+	"github.com/zengchen1024/obs-worker/sdk/workerstate"
 	"github.com/zengchen1024/obs-worker/utils"
 )
 
 func (b *BuildManager) sendIdleState() {
-	state := "idle"
-
-	opts := worker.QueryOpts{
-		WorkerId: b.cfg.Id,
-		State:    state,
-		Port:     b.port,
-		Arch:     b.cfg.HostArch,
-	}
+	state := workerstate.WorkerStateIdle
+	opts := b.genWorkerStateOpts(state)
 
 	for _, server := range b.cfg.RepoServers {
-		b.w.RegisterServer = server
-
 		utils.LogInfo("register to %s", server)
 
+		b.w.RegisterServer = server
+
 		if err := worker.Create(&b.hc, server, &opts, &b.w); err != nil {
-			utils.LogErr("send idle state, err:%v", err)
+			utils.LogErr("send %s state, err:%v", state, err)
 		}
 	}
 }
 
 func (b *BuildManager) sendExitState() {
-	state := "exit"
+	state := workerstate.WorkerStateExit
+	opts := b.genWorkerStateOpts(state)
 
-	opts := worker.QueryOpts{
+	for _, server := range b.cfg.RepoServers {
+		if err := worker.Get(&b.hc, server, &opts); err != nil {
+			utils.LogErr("send %s state, err:%v", state, err)
+		}
+	}
+}
+
+func (b *BuildManager) sendBuildingState(excludedServer string) {
+	state := workerstate.WorkerStateBuilding
+	opts := b.genWorkerStateOpts(state)
+
+	for _, server := range b.cfg.RepoServers {
+		if server == excludedServer {
+			continue
+		}
+
+		if err := worker.Get(&b.hc, server, &opts); err != nil {
+			utils.LogErr("send %s state, err:%v", state, err)
+		}
+	}
+}
+
+func (b *BuildManager) genWorkerStateOpts(state string) worker.QueryOpts {
+	return worker.QueryOpts{
 		WorkerId: b.cfg.Id,
 		State:    state,
 		Port:     b.port,
 		Arch:     b.cfg.HostArch,
-	}
-
-	for _, server := range b.cfg.RepoServers {
-		if err := worker.Get(&b.hc, server, &opts); err != nil {
-			utils.LogErr("send exit state, err:%v", err)
-		}
 	}
 }
 

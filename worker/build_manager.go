@@ -30,6 +30,8 @@ type BuildManager struct {
 
 	job       build.Build
 	nobadhost string
+
+	wg sync.WaitGroup
 }
 
 func (b *BuildManager) canBuild(info *buildinfo.BuildInfo) error {
@@ -52,7 +54,7 @@ func (b *BuildManager) createJob(registerServer string, j *Job) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	if b.state.State != "idle" {
+	if b.state.State != workerstate.WorkerStateIdle {
 		return fmt.Errorf("I am not idle!\n")
 	}
 
@@ -71,11 +73,44 @@ func (b *BuildManager) createJob(registerServer string, j *Job) error {
 		return err
 	}
 
+	go func() {
+		b.wg.Add(1)
+		defer b.wg.Done()
+
+		b.runJob(job)
+	}()
+
 	b.job = job
-	b.state.JobId = j.Id
 	b.nobadhost = j.NoBadHost
 
+	state := &b.state
+	state.State = workerstate.WorkerStateBuilding
+	state.JobId = j.Id
+	/*
+		if j.Logidlelimit != 0 {
+			state.LogIdleLimit = j.Logidlelimit
+		}
+		if j.LogSizeLimit != 0 {
+
+		}
+	*/
+
+	if registerServer == "" {
+		registerServer = j.RepoServer
+	}
+	b.sendBuildingState(registerServer)
+
 	return nil
+}
+
+func (b *BuildManager) runJob(job build.Build) {
+	err := job.Do()
+	utils.LogErr("run job, err:%v", err)
+	// TODO post action
+}
+
+func (b *BuildManager) wait() {
+	b.wg.Wait()
 }
 
 func (b *BuildManager) GetJob(jobid string) (buildinfo.BuildInfo, error) {
@@ -203,5 +238,6 @@ func Init(cfg *build.Config, port int) error {
 func Exit() {
 	if instance != nil {
 		instance.sendExitState()
+		instance.wait()
 	}
 }
