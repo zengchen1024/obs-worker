@@ -119,6 +119,17 @@ func (b *BuildManager) SetBadHostJob(jobid string) error {
 	return b.updateJob(jobid, "badhost", "\n\nTriggered badhost state for job\n")
 }
 
+func (b *BuildManager) GetBuildLog(jobid string, callback func(string) error) error {
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+
+	if err := b.checkWorkerState(jobid, true); err != nil {
+		return err
+	}
+
+	return callback(b.job.GetBuildLogFile())
+}
+
 func (b *BuildManager) updateJob(jobid, state, log string) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()

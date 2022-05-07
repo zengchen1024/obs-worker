@@ -12,6 +12,7 @@ type Build interface {
 	Kill()
 	SetSysrq()
 	AppenBuildLog(string)
+	GetBuildLogFile() string
 }
 
 func NewBuild(cfg *Config, info *buildinfo.BuildInfo) (Build, error) {

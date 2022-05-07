@@ -229,3 +229,6 @@ func (b *nonModeBuid) GetBuildInfo() *buildinfo.BuildInfo {
 func (b *nonModeBuid) Kill()                  {}
 func (b *nonModeBuid) SetSysrq()              {}
 func (b *nonModeBuid) AppenBuildLog(s string) {}
+func (b *nonModeBuid) GetBuildLogFile() string {
+	return b.env.logFile
+}

@@ -84,4 +84,5 @@ func register() {
 	http.HandleFunc("/discard", c.DiscardJob)
 	http.HandleFunc("/badhost", c.SetBadHostJob)
 	http.HandleFunc("/sysrq", c.SetSysrqJob)
+	http.HandleFunc("/logfile", c.GetBuildLog)
 }
