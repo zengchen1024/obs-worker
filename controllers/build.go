@@ -13,7 +13,7 @@ import (
 
 const separator = "\r\n"
 
-type result interface {
+type respData interface {
 	Marshal() ([]byte, error)
 }
 
@@ -30,35 +30,40 @@ func (c baseController) replyMsg(w http.ResponseWriter, code int, s string) {
 	})
 }
 
-func (c baseController) reply(w http.ResponseWriter, code int, r result) {
-	data := []string{""}
+func (c baseController) reply(w http.ResponseWriter, code int, r respData) {
+	header := []string{""}
 
 	if code > 300 || code < 200 {
-		data[0] = fmt.Sprintf("HTTP/1.1 %d Error", code)
+		header[0] = fmt.Sprintf("HTTP/1.1 %d Error", code)
 	} else {
 		code = 200
-		data[0] = "HTTP/1.1 200 OK"
+		header[0] = "HTTP/1.1 200 OK"
 	}
 
-	data = append(
-		data,
+	header = append(
+		header,
 		"Content-Type: text/xml",
 		"Cache-Control: no-cache",
 		"Connection: close",
 	)
 
-	v, err := r.Marshal()
-	if err == nil {
-		data = append(
-			data,
-			fmt.Sprintf("Content-Length: %d", len(v)),
-			separator,
-		)
+	var data []byte
+	if r != nil {
+		if v, err := r.Marshal(); err == nil {
+			header = append(
+				header,
+				fmt.Sprintf("Content-Length: %d", len(v)),
+			)
+
+			data = v
+		}
 	}
+
+	header = append(header, separator)
 
 	w.WriteHeader(code)
 
-	fmt.Fprint(w, strings.Join(data, separator), v)
+	fmt.Fprint(w, strings.Join(header, separator), data)
 }
 
 type BuildController struct {
@@ -111,6 +116,8 @@ func (b BuildController) extract(
 	r *http.Request,
 	job *worker.Job,
 ) (string, error) {
+	defer r.Body.Close()
+
 	if v := r.Header.Get("expect"); strings.ToLower(v) == "100-continue" {
 		fmt.Fprint(w, "HTTP/1.1 100 continue\r\n\r\n")
 	}
