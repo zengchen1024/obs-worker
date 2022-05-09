@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/zengchen1024/obs-worker/sdk/statistic"
+	"github.com/zengchen1024/obs-worker/utils"
 )
 
 type buildStats struct {
@@ -57,7 +58,7 @@ func (s *buildStats) do(dir string) {
 
 	if b, err := s.stats.Marshal(); err == nil {
 		tmp := filepath.Join(dir, "_statistics.new")
-		if nil == writeFile(tmp, b) {
+		if nil == utils.WriteFile(tmp, b) {
 			os.Rename(tmp, strings.TrimSuffix(tmp, ".new"))
 		}
 	}

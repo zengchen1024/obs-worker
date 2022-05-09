@@ -137,10 +137,6 @@ func readFileLineByLine(filename string, handle func(string) bool) error {
 	return nil
 }
 
-func writeFile(f string, data []byte) error {
-	return os.WriteFile(f, data, 0644)
-}
-
 func mkdir(dir string) error {
 	return os.Mkdir(dir, os.FileMode(0777))
 }
@@ -150,7 +146,6 @@ func mkdirAll(dir string) error {
 }
 
 func cleanDir(dir string) {
-	// TODO: refactor it
 	d, err := os.ReadDir(dir)
 	if err != nil {
 		return

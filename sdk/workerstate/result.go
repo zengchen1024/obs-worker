@@ -4,15 +4,24 @@ import (
 	"encoding/xml"
 )
 
+const (
+	WorkerStateIdle      = "idle"
+	WorkerStateExit      = "exit"
+	WorkerStateKilled    = "killed"
+	WorkerStateBadHost   = "badhost"
+	WorkerStateBuilding  = "building"
+	WorkerStateDiscarded = "discarded"
+)
+
 type WorkerState struct {
 	XMLName xml.Name `xml:"workerstate"`
 
 	State        string `xml:"state"`
-	Nextstate    string `xml:"nextstate"`
-	Jobid        string `xml:"jobid"`
+	NextState    string `xml:"nextstate"`
+	JobId        string `xml:"jobid"`
 	Pid          string `xml:"pid"`
-	Logsizelimit string `xml:"logsizelimit"`
-	Logidlelimit string `xml:"logidlelimit"`
+	LogSizeLimit string `xml:"logsizelimit"`
+	LogIdleLimit string `xml:"logidlelimit"`
 }
 
 func (s *WorkerState) Marshal() ([]byte, error) {

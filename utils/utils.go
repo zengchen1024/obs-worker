@@ -47,3 +47,7 @@ func ReadFileLineByLine(filename string, handle func(string) bool) error {
 
 	return nil
 }
+
+func WriteFile(f string, data []byte) error {
+	return os.WriteFile(f, data, 0644)
+}

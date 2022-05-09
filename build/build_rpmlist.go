@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/zengchen1024/obs-worker/sdk/buildinfo"
+	"github.com/zengchen1024/obs-worker/utils"
 )
 
 type buildRpmlist struct {
@@ -115,7 +116,7 @@ func (b *buildRpmlist) generate() error {
 		})
 	}
 
-	writeFile(
+	utils.WriteFile(
 		b.env.rpmList,
 		[]byte(strings.Join(rpmList, "\n")+"\n"),
 	)

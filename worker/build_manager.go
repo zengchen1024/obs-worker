@@ -2,6 +2,7 @@ package worker
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -24,36 +25,13 @@ type BuildManager struct {
 	w    worker.Worker
 	port int
 
-	state workerstate.WorkerState
-	job   build.Build
 	lock  sync.RWMutex
-}
+	state workerstate.WorkerState
 
-func (b *BuildManager) canBuild(info *buildinfo.BuildInfo) error {
-	if b.cfg.LocalKiwi != "" {
-		name := fmt.Sprintf("%s/%s", info.Arch, info.Job)
+	job       build.Build
+	nobadhost string
 
-		if !strings.HasSuffix(info.File, ".kiwi") {
-			return fmt.Errorf("bad job: %s: not a kiwi job\n", name)
-		}
-
-		if !(len(info.ImageType) > 0 && info.ImageType[0] == "product") {
-			return fmt.Errorf("bad job: %s: not a kiwi product job\n", name)
-		}
-	}
-
-	return nil
-}
-
-func (b *BuildManager) createJob(registerServer string, info *buildinfo.BuildInfo) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	if b.state.State != "idle" {
-		return fmt.Errorf("I am not idle!\n")
-	}
-
-	return nil
+	wg sync.WaitGroup
 }
 
 func (b *BuildManager) GetJob(jobid string) (buildinfo.BuildInfo, error) {
@@ -152,11 +130,15 @@ func (b *BuildManager) checkWorkerState(jobid string, needBuilding bool) error {
 		return fmt.Errorf("not building a job")
 	}
 
-	if jobid != "" && jobid != b.state.Jobid {
+	if jobid != "" && jobid != b.state.JobId {
 		return fmt.Errorf("building a different job")
 	}
 
 	return nil
+}
+
+func (b *BuildManager) wait() {
+	b.wg.Wait()
 }
 
 func Init(cfg *build.Config, port int) error {
@@ -181,5 +163,6 @@ func Init(cfg *build.Config, port int) error {
 func Exit() {
 	if instance != nil {
 		instance.sendExitState()
+		instance.wait()
 	}
 }
