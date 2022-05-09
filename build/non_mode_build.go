@@ -120,11 +120,13 @@ func (b *nonModeBuid) Do() error {
 		return err
 	}
 
-	if err := b.build.do(); err != nil {
+	if _, err := b.build.do(); err != nil {
 		return err
 	}
 
 	dir := b.env.otherDir
+
+	mkdirAll(dir)
 
 	b.stats.do(dir)
 

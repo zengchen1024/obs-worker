@@ -2,8 +2,6 @@ package worker
 
 import (
 	"fmt"
-	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/zengchen1024/obs-worker/build"
