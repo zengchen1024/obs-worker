@@ -2,7 +2,9 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -97,6 +99,65 @@ func ReadData(r io.Reader, name string, total int64) ([]byte, error) {
 	return buf, nil
 }
 
+func ReadTo(ctx context.Context, r io.Reader, buf []byte) (int, error) {
+	last := len(buf)
+
+	for start, n := 0, 0; last > 0; {
+		if IsCtxDone(ctx) {
+			return 0, fmt.Errorf("canceled")
+		}
+
+		if n = 8192; last < n {
+			n = last
+		}
+
+		n, err := r.Read(buf[start : start+n])
+		if err != nil && n == 0 {
+			if errors.Is(err, io.EOF) {
+				return start, nil
+			}
+
+			return start, err
+		}
+
+		start += n
+		last -= n
+	}
+
+	return len(buf), nil
+}
+
+func WriteChunk(ctx context.Context, w io.Writer, buf []byte) error {
+
+	write := func(w io.Writer, data []byte) error {
+		for offset, total := 0, len(data); offset < total; {
+			if IsCtxDone(ctx) {
+				return fmt.Errorf("canceled")
+			}
+
+			n, err := w.Write(data[offset:])
+			if err != nil {
+				return err
+			}
+
+			offset += n
+		}
+
+		return nil
+	}
+
+	err := write(w, []byte(fmt.Sprintf("%X\r\n", len(buf))))
+	if err != nil {
+		return err
+	}
+
+	if err = write(w, buf); err != nil {
+		return err
+	}
+
+	return write(w, []byte("\r\n"))
+}
+
 func JsonMarshal(t interface{}) ([]byte, error) {
 	buffer := &bytes.Buffer{}
 	enc := json.NewEncoder(buffer)
@@ -136,4 +197,13 @@ func GenURL(endpoint, query string) (string, error) {
 	}
 
 	return v.String(), nil
+}
+
+func IsCtxDone(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+		return false
+	}
 }
