@@ -156,6 +156,8 @@ func (r *reader) readFile(ctx context.Context, w io.Writer, file File) error {
 		return err
 	}
 
+	defer fi.Close()
+
 	if len(h) >= r.size {
 		return fmt.Errorf("maybe too long file name")
 	}

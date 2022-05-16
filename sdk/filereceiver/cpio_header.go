@@ -103,28 +103,22 @@ func Encode(info os.FileInfo, name string, cpioType *uint) (string, int) {
 	if name == "" {
 		name = info.Name()
 	}
-	name += "\x00"
 
 	h := CPIOFileHeader{
-		Mode:     int64(mode),
-		Mtime:    info.ModTime().Unix(),
-		Size:     info.Size(),
-		Namesize: len(name),
+		Mode:  int64(mode),
+		Mtime: info.ModTime().Unix(),
+		Size:  info.Size(),
 	}
 
-	s := h.Marshal() + name
-
-	if n := len(s) & 3; n != 0 {
-		s += strings.Repeat("\x00", 4-n)
-	}
-
-	return s, h.GetPad()
+	return encode(&h, name), h.GetPad()
 }
 
 func EncodeEmpty() string {
-	name := "TRAILER!!!\x00"
+	return encode(&CPIOFileHeader{}, "TRAILER!!!")
+}
 
-	h := CPIOFileHeader{}
+func encode(h *CPIOFileHeader, name string) string {
+	name += "\x00"
 	h.Namesize = len(name)
 
 	s := h.Marshal() + name
