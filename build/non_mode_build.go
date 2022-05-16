@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/zengchen1024/obs-worker/sdk/buildinfo"
+	"github.com/zengchen1024/obs-worker/sdk/job"
 	"github.com/zengchen1024/obs-worker/utils"
 )
 
@@ -90,7 +91,7 @@ func newNonModeBuild(cfg *Config, info *buildinfo.BuildInfo) (*nonModeBuid, erro
 	return &b, nil
 }
 
-func (b *nonModeBuid) Do() error {
+func (b *nonModeBuid) DoBuild(jobId string) error {
 	if err := b.env.init(b.cfg); err != nil {
 		return err
 	}
@@ -120,7 +121,8 @@ func (b *nonModeBuid) Do() error {
 		return err
 	}
 
-	if _, err := b.build.do(); err != nil {
+	_, err := b.build.do()
+	if err != nil {
 		return err
 	}
 
@@ -133,6 +135,8 @@ func (b *nonModeBuid) Do() error {
 	b.out.writeBuildEnv(dir)
 
 	b.report.do(dir)
+
+	b.postBuild(jobId)
 
 	return nil
 }
@@ -234,4 +238,63 @@ func (b *nonModeBuid) SetSysrq()              {}
 func (b *nonModeBuid) AppenBuildLog(s string) {}
 func (b *nonModeBuid) GetBuildLogFile() string {
 	return b.env.logFile
+}
+
+func (b *nonModeBuid) postBuild(jobId string) {
+	info := b.getBuildInfo()
+
+	opt := job.Opts{
+		Job:      info.Job,
+		Arch:     info.Arch,
+		JobId:    jobId,
+		Code:     "succeeded",
+		WorkerId: b.cfg.Id,
+	}
+
+	files := b.listBuildResultFiles()
+	if len(files) == 0 {
+		opt.Code = "failed"
+	}
+
+	files = append(files,
+		job.File{
+			Name: "meta",
+			Path: b.env.meta,
+		},
+		job.File{
+			Name: "logfile",
+			Path: b.env.logFile,
+		},
+	)
+
+	err := job.Put(b.gethc(), info.RepoServer, opt, files)
+	if err != nil {
+		utils.LogErr("upload build files, err:%s", err.Error())
+	}
+}
+
+func (b *nonModeBuid) listBuildResultFiles() []job.File {
+	dir := b.env.packages
+	dirs := lsDirs(filepath.Join(dir, "RPMS"))
+	dirs = append(
+		dirs,
+		filepath.Join(dir, "SRPMS"),
+		filepath.Join(dir, "OTHER"),
+	)
+
+	r := []job.File{}
+
+	for _, dir := range dirs {
+		v := lsFiles(dir)
+		for _, name := range v {
+			if name != "same_result_marker" && name != ".kiwitree" {
+				r = append(r, job.File{
+					Name: name,
+					Path: filepath.Join(dir, name),
+				})
+			}
+		}
+	}
+
+	return r
 }

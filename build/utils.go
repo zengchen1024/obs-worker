@@ -155,3 +155,35 @@ func cleanDir(dir string) {
 		os.RemoveAll(filepath.Join(dir, item.Name()))
 	}
 }
+
+func lsDirs(dir string) []string {
+	d, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+
+	r := make([]string, 0, len(d))
+	for _, item := range d {
+		if item.IsDir() {
+			r = append(r, filepath.Join(dir, item.Name()))
+		}
+	}
+
+	return r
+}
+
+func lsFiles(dir string) []string {
+	d, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+
+	r := make([]string, 0, len(d))
+	for _, item := range d {
+		if item.Type().IsRegular() {
+			r = append(r, item.Name())
+		}
+	}
+
+	return r
+}

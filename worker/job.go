@@ -81,13 +81,6 @@ func (b *BuildManager) createJob(registerServer string, j *Job) error {
 		return err
 	}
 
-	go func() {
-		b.wg.Add(1)
-		defer b.wg.Done()
-
-		b.runJob(job)
-	}()
-
 	b.job = job
 	b.nobadhost = j.NoBadHost
 
@@ -108,11 +101,45 @@ func (b *BuildManager) createJob(registerServer string, j *Job) error {
 	}
 	b.sendBuildingState(registerServer)
 
+	go func() {
+		b.wg.Add(1)
+		defer b.wg.Done()
+
+		b.runJob(j.Id, job)
+	}()
+
 	return nil
 }
 
-func (b *BuildManager) runJob(job build.Build) {
-	err := job.Do()
-	utils.LogErr("run job, err:%v", err)
-	// TODO post action
+func (b *BuildManager) runJob(jobId string, job build.Build) {
+	if err := job.DoBuild(jobId); err != nil {
+		utils.LogErr("do build job:%s, err:%s", jobId, err.Error())
+	}
+
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	b.sendIdleState()
+}
+
+func (b *BuildManager) postBuid(code int) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	if b.checkIfDiscard() {
+		return
+	}
+
+	state := &b.state
+
+	if s := state.State; s == workerstate.WorkerStateBadHost {
+		code = 3
+	} else if s != workerstate.WorkerStateBuilding {
+		code = 1
+	}
+
+}
+
+func (b *BuildManager) checkIfDiscard() bool {
+	return false
 }

@@ -127,35 +127,21 @@ func ReadTo(ctx context.Context, r io.Reader, buf []byte) (int, error) {
 	return len(buf), nil
 }
 
-func WriteChunk(ctx context.Context, w io.Writer, buf []byte) error {
-
-	write := func(w io.Writer, data []byte) error {
-		for offset, total := 0, len(data); offset < total; {
-			if IsCtxDone(ctx) {
-				return fmt.Errorf("canceled")
-			}
-
-			n, err := w.Write(data[offset:])
-			if err != nil {
-				return err
-			}
-
-			offset += n
+func Write(ctx context.Context, w io.Writer, data []byte) error {
+	for offset, total := 0, len(data); offset < total; {
+		if IsCtxDone(ctx) {
+			return fmt.Errorf("canceled")
 		}
 
-		return nil
+		n, err := w.Write(data[offset:])
+		if err != nil {
+			return err
+		}
+
+		offset += n
 	}
 
-	err := write(w, []byte(fmt.Sprintf("%X\r\n", len(buf))))
-	if err != nil {
-		return err
-	}
-
-	if err = write(w, buf); err != nil {
-		return err
-	}
-
-	return write(w, []byte("\r\n"))
+	return nil
 }
 
 func JsonMarshal(t interface{}) ([]byte, error) {

@@ -83,9 +83,9 @@ func (h *CPIOFileHeader) Marshal() string {
 	return s + fmt.Sprintf("%08x00000000", h.Namesize)
 }
 
-func Encode(info os.FileInfo, name string, cpioType *uint) string {
+func Encode(info os.FileInfo, name string, cpioType *uint) (string, int) {
 	if info == nil {
-		return ""
+		return "", 0
 	}
 
 	mode := uint(info.Mode())
@@ -111,6 +111,21 @@ func Encode(info os.FileInfo, name string, cpioType *uint) string {
 		Size:     info.Size(),
 		Namesize: len(name),
 	}
+
+	s := h.Marshal() + name
+
+	if n := len(s) & 3; n != 0 {
+		s += strings.Repeat("\x00", 4-n)
+	}
+
+	return s, h.GetPad()
+}
+
+func EncodeEmpty() string {
+	name := "TRAILER!!!\x00"
+
+	h := CPIOFileHeader{}
+	h.Namesize = len(name)
 
 	s := h.Marshal() + name
 

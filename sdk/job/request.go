@@ -3,11 +3,13 @@ package job
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/zengchen1024/obs-worker/sdk/filereceiver"
@@ -97,66 +99,111 @@ func upload(hc *utils.HttpClient, urlStr string, files []File) error {
 }
 
 func write(ctx context.Context, w io.Writer, files []File) {
-	for _, item := range files {
-		if err := writeCpioFile(ctx, w, item); err != nil {
-			utils.LogErr("write %s failed, err:%s", item.Path, err.Error())
+	r := newReader()
+
+	for _, file := range files {
+		if err := r.readFile(ctx, w, file); err != nil {
+			utils.LogErr(
+				"write failed cpio file%s, err:%s",
+				file.Path, err.Error(),
+			)
 
 			return
 		}
 	}
 
-	s := "07070100000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000b00000000TRAILER!!!\x00\x00\x00\x000\r\n\r\n"
+	s := filereceiver.EncodeEmpty()
 
-	if err := utils.WriteChunk(ctx, w, []byte(s)); err != nil {
+	if err := utils.Write(ctx, w, []byte(s)); err != nil {
 		utils.LogErr("write the last chunk failed, err:%s", err.Error())
 	}
 }
 
-func writeCpioFile(ctx context.Context, w io.Writer, file File) error {
+func newReader() (r reader) {
+	r.size = 1 << 13
+	r.start = 0
+	r.end = r.start + r.size
+
+	// buf is chunked. the buf struct is: data + [\0 * pad]
+	// the pad is 3 bytes at most, therefor the buf size if 8k + 4
+	r.buf = make([]byte, r.size+4)
+
+	return
+}
+
+type reader struct {
+	buf   []byte
+	size  int
+	start int
+	end   int
+	pad   int
+	total int64
+}
+
+func (r *reader) readFile(ctx context.Context, w io.Writer, file File) error {
 	info, err := os.Stat(file.Path)
 	if err != nil {
 		return err
 	}
 
-	h := filereceiver.Encode(info, file.Name, nil)
+	h, pad := filereceiver.Encode(info, file.Name, nil)
 
-	size := 1 << 13
-	buf := make([]byte, size)
-
-	copy(buf, []byte(h))
+	r.pad = pad
+	r.total = info.Size()
 
 	fi, err := os.Open(file.Path)
 	if err != nil {
 		return err
 	}
 
-	n, err := utils.ReadTo(ctx, fi, buf[len(h):])
+	if len(h) >= r.size {
+		return fmt.Errorf("maybe too long file name")
+	}
+
+	copy(r.buf[r.start:], h)
+
+	n, err := r.read(ctx, fi, r.start+len(h))
 	if err != nil {
 		return err
 	}
 
-	if err := utils.WriteChunk(ctx, w, buf[:len(h)+n]); err != nil {
+	if err = utils.Write(ctx, w, r.buf[:n]); err != nil {
 		return err
 	}
 
-	for {
-		n, err := utils.ReadTo(ctx, fi, buf)
+	for r.total > 0 {
+		n, err := r.read(ctx, fi, r.start)
 		if err != nil {
 			return err
 		}
 
-		if n == 0 {
-			break
-		}
-
-		if err := utils.WriteChunk(ctx, w, buf[:n]); err != nil {
+		if err = utils.Write(ctx, w, r.buf[:n]); err != nil {
 			return err
-		}
-
-		if n < size {
-			break
 		}
 	}
 
 	return nil
+}
+
+func (r *reader) read(ctx context.Context, fi io.Reader, start int) (int, error) {
+	offset := start
+
+	n, err := utils.ReadTo(ctx, fi, r.buf[offset:r.end])
+	if err != nil {
+		return 0, err
+	}
+
+	r.total -= int64(n)
+	offset += n
+
+	if r.total == 0 && r.pad > 0 {
+		copy(
+			r.buf[offset:],
+			[]byte(strings.Repeat("\x00", r.pad)),
+		)
+
+		offset += r.pad
+	}
+
+	return offset, nil
 }

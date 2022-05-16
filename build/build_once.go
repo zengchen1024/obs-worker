@@ -7,7 +7,8 @@ import (
 )
 
 type Build interface {
-	Do() error
+	DoBuild(string) error
+
 	GetBuildInfo() *buildinfo.BuildInfo
 	Kill()
 	SetSysrq()
