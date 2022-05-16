@@ -55,12 +55,6 @@ func (env *buildEnv) init(cfg *Config) error {
 
 	cleanDir(env.pkgdir)
 
-	if dir := env.otherDir; !isFileExist(dir) {
-		if err := mkdir(dir); err != nil {
-			return err
-		}
-	}
-
 	return os.Setenv("BUILD_DIR", filepath.Join(cfg.StateDir, "build"))
 }
 

@@ -33,11 +33,11 @@ func (c baseController) replyMsg(w http.ResponseWriter, code int, s string) {
 func (c baseController) reply(w http.ResponseWriter, code int, r respData) {
 	header := []string{""}
 
-	if code > 300 || code < 200 {
-		header[0] = fmt.Sprintf("HTTP/1.1 %d Error", code)
-	} else {
+	if code == 0 || (code >= 200 && code < 300) {
 		code = 200
 		header[0] = "HTTP/1.1 200 OK"
+	} else {
+		header[0] = fmt.Sprintf("HTTP/1.1 %d Error", code)
 	}
 
 	header = append(

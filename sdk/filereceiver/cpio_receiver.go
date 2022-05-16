@@ -19,16 +19,6 @@ type CPIOFileMeta struct {
 	CPIOFileHeader
 }
 
-type CPIOFileHeader struct {
-	Namesize int
-	Size     int64
-	Mtime    int64
-	Mode     int64
-	Type     int
-	Pad      int
-	Namepad  int
-}
-
 // return 1. new name, 2. path to save file, 3. whether calc md5
 type CPIOPreCheck func(string, *CPIOFileHeader) (string, string, bool, error)
 

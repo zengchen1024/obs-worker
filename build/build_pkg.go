@@ -15,15 +15,37 @@ type buildPkg struct {
 	needOBSPackage bool
 }
 
-func (b *buildPkg) do() error {
+func (b *buildPkg) do() (int, error) {
 	v := b.genArgs()
 
-	out, err, _ := utils.RunCmd(v...)
+	out, err, code := utils.RunCmd(v...)
+	utils.LogInfo("build pkd, err:%v, code=%d", err, code)
+
 	if err != nil {
-		return fmt.Errorf("%s, %v", out, err)
+		err = fmt.Errorf("%s, %v", out, err)
+
+		switch code {
+		case 512:
+			if b.getBuildInfo().Reason != "rebuild counter sync" {
+				return 2, err
+			}
+
+			code = 0
+			err = nil
+
+		case 768:
+			return 3, err
+
+		default:
+			return 1, err
+		}
 	}
 
-	return nil
+	if v, _ := isEmptyFile(b.env.logFile); v {
+		return 1, fmt.Errorf("build succeeded, but no logfile?")
+	}
+
+	return code, err
 }
 
 func (b *buildPkg) genArgs() []string {
