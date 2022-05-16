@@ -43,7 +43,7 @@ func (b *BuildManager) GetJob(jobid string) (buildinfo.BuildInfo, error) {
 		return info, err
 	}
 
-	if state == "building" {
+	if state == workerstate.WorkerStateBuilding {
 		return *b.job.GetBuildInfo(), nil
 	}
 
@@ -84,15 +84,15 @@ func (b *BuildManager) SetSysrqJob(jobid string) error {
 	return nil
 }
 func (b *BuildManager) KillJob(jobid string) error {
-	return b.updateJob(jobid, "killed", "\n\nKilled job\n")
+	return b.updateJob(jobid, workerstate.WorkerStateKilled, "\n\nKilled job\n")
 }
 
 func (b *BuildManager) DiscardJob(jobid string) error {
-	return b.updateJob(jobid, "discarded", "\n\nDiscarded job\n")
+	return b.updateJob(jobid, workerstate.WorkerStateDiscarded, "\n\nDiscarded job\n")
 }
 
 func (b *BuildManager) SetBadHostJob(jobid string) error {
-	return b.updateJob(jobid, "badhost", "\n\nTriggered badhost state for job\n")
+	return b.updateJob(jobid, workerstate.WorkerStateBadHost, "\n\nTriggered badhost state for job\n")
 }
 
 func (b *BuildManager) GetBuildLog(jobid string, callback func(string) error) error {
@@ -124,7 +124,7 @@ func (b *BuildManager) updateJob(jobid, state, log string) error {
 }
 
 func (b *BuildManager) checkWorkerState(jobid string, needBuilding bool) error {
-	if (jobid != "" || needBuilding) && b.state.State != "building" {
+	if (jobid != "" || needBuilding) && b.state.State != workerstate.WorkerStateBuilding {
 		return fmt.Errorf("not building a job")
 	}
 
@@ -151,7 +151,7 @@ func Init(cfg *build.Config, port int) error {
 
 	b.sendIdleState()
 
-	b.state.State = "idle"
+	b.state.State = workerstate.WorkerStateIdle
 
 	instance = &b
 
