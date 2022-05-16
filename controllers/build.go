@@ -77,16 +77,22 @@ func (b BuildController) Build(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	utils.LogInfo("get job")
+
 	job := worker.Job{}
 
 	jobId, err := b.extract(w, r, &job)
 	if err != nil {
+		utils.LogErr("extract job failed, err:%s", err.Error())
+
 		b.replyMsg(w, 400, err.Error())
 
 		return
 	}
 
 	if err := job.Validate(); err != nil {
+		utils.LogErr("invalid job, err:%s", err.Error())
+
 		b.replyMsg(w, 400, err.Error())
 
 		return
@@ -103,10 +109,17 @@ func (b BuildController) Build(w http.ResponseWriter, r *http.Request) {
 	job.Id = jobId
 
 	if err = job.Create(q.Get("registerserver")); err != nil {
+		utils.LogErr("create job failed, err:%s", err.Error())
+
 		b.replyMsg(w, 500, err.Error())
 
 		return
 	}
+
+	utils.LogInfo(
+		"start job: %s, %s/%s/%s",
+		jobId, job.Project, job.Repository, job.Package,
+	)
 
 	b.replyMsg(w, 0, "so much work, so little time...")
 }

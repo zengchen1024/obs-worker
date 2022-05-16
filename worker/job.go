@@ -120,6 +120,8 @@ func (b *BuildManager) runJob(jobId string, job build.Build) {
 	defer b.lock.Unlock()
 
 	b.sendIdleState()
+
+	b.state.State = workerstate.WorkerStateIdle
 }
 
 func (b *BuildManager) postBuid(code int) {
