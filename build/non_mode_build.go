@@ -28,11 +28,12 @@ type nonModeBuid struct {
 	needOBSPackage bool
 }
 
-func newNonModeBuild(cfg *Config, info *buildinfo.BuildInfo) (*nonModeBuid, error) {
+func newNonModeBuild(workDir string, cfg *Config, info *buildinfo.BuildInfo) (*nonModeBuid, error) {
 	b := nonModeBuid{
 		buildHelper: buildHelper{
-			cfg:  cfg,
-			info: BuildInfo{BuildInfo: *info},
+			cfg:     cfg,
+			info:    BuildInfo{BuildInfo: *info},
+			workDir: workDir,
 		},
 	}
 
@@ -48,12 +49,8 @@ func newNonModeBuild(cfg *Config, info *buildinfo.BuildInfo) (*nonModeBuid, erro
 		buildHelper: h,
 	}
 
-	b.cache = cacheManager{
-		buildHelper: h,
-	}
-	if err := b.cache.init(); err != nil {
-		return nil, err
-	}
+	b.cache = cacheManager{}
+	b.cache.init(h)
 
 	b.oldpkg = buildOldPackages{
 		buildHelper:           h,
@@ -177,7 +174,7 @@ func (b *nonModeBuid) fetchSources() error {
 	}
 
 	if ignoreImage {
-		b.report.needCollectOrigins = true
+		b.report.collectOrigins = true
 	}
 
 	v, err := b.binaryLoader.getBinaries(!ignoreImage)
@@ -204,6 +201,7 @@ func (b *nonModeBuid) parseBuildFile() (
 
 	readFileLineByLine(filename, func(line string) bool {
 		bs := []byte(line)
+
 		if re0.Match(bs) {
 			ignoreImage = true
 		}
@@ -226,6 +224,7 @@ func (b *nonModeBuid) parseBuildFile() (
 	if needOBSPackage {
 		b.build.needOBSPackage = true
 	}
+
 	return
 }
 

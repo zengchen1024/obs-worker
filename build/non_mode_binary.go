@@ -23,12 +23,6 @@ type nonModeBinary struct {
 }
 
 func (b *nonModeBinary) getBinaries(considerPreInstallImg bool) ([]string, error) {
-	if dir := b.getPkgdir(); !isFileExist(dir) {
-		if err := mkdir(dir); err != nil {
-			return nil, err
-		}
-	}
-
 	v := b.getBuildInfo().getNotSrcBDep()
 	if len(v) == 0 {
 		return nil, fmt.Errorf("no binaries needed for this package")

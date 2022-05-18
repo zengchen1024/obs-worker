@@ -24,13 +24,14 @@ func (h *preInstallImageManager) getPreInstallImage(bins []string) (pre preInsta
 	metas := make(map[string]binary.Binary)
 	hdrmd5s := make(map[string]string)
 	imageOrigins := make(map[string]string)
-	binsSet := sets.NewString(bins...)
 
+	binsSet := sets.NewString(bins...)
 	info := h.getBuildInfo()
 	for _, repo := range info.Paths {
 		v, endpoint, err := h.getBinary(&repo, binsSet.UnsortedList())
 		if err != nil {
-			utils.LogErr("getbinaryversions, err:%v\n", err)
+			utils.LogErr("getbinaryversions, err:%s", err.Error())
+
 			continue
 		}
 
@@ -49,6 +50,7 @@ func (h *preInstallImageManager) getPreInstallImage(bins []string) (pre preInsta
 		}
 
 		nometa := info.isRepoNoMeta(&repo)
+
 		items := v.Binaries
 		for i := range items {
 			item := &items[i]
@@ -65,6 +67,7 @@ func (h *preInstallImageManager) getPreInstallImage(bins []string) (pre preInsta
 				if binsSet.Has(bin) {
 					hdrmd5s[bin] = item.HdrMD5
 					imageOrigins[bin] = prpa
+
 					binsSet.Delete(bin)
 				}
 			}
@@ -76,16 +79,20 @@ func (h *preInstallImageManager) getPreInstallImage(bins []string) (pre preInsta
 	}
 
 	if len(prpas) == 0 {
-		utils.LogErr("no prpas\n")
+		utils.LogErr("no prpas")
+
 		return
 	}
 
 	for _, item := range info.getNoInstallBDep() {
-		delete(hdrmd5s, item.Name)
+		if _, ok := hdrmd5s[item.Name]; ok {
+			delete(hdrmd5s, item.Name)
+		}
 	}
 
 	if len(hdrmd5s) == 0 {
-		utils.LogErr("no hdrmd5s\n")
+		utils.LogErr("no hdrmd5s")
+
 		return
 	}
 
@@ -133,6 +140,7 @@ func (h *preInstallImageManager) getBinary(repo *RepoPath, bins []string) (
 	}
 
 	endpoint := info.getRepoServer(repo)
+
 	v, err := binary.List(h.gethc(), endpoint, &opts)
 
 	return v, endpoint, err
@@ -159,10 +167,11 @@ func (h *preInstallImageManager) getImagesFromRepo(
 			&image.QueryOpts{
 				Prpa: prpa,
 			},
-			match,
+			match, h.workDir,
 		)
 		if err != nil {
-			utils.LogErr("getpreinstallimageinfos, err = %v\n", err)
+			utils.LogErr("getpreinstallimageinfos, err: %s", err.Error())
+
 			continue
 		}
 
@@ -229,7 +238,7 @@ func (h *preInstallImageManager) findBestImage(
 			continue
 		}
 
-		if img.SizeK == "" || img.HdrMD5 == "" {
+		if img.SizeK == 0 || img.HdrMD5 == "" {
 			continue
 		}
 
@@ -307,9 +316,7 @@ func (h *preInstallImageManager) isImageInCache(img *imageInfo) bool {
 func (h *preInstallImageManager) downloadImage(img *imageInfo) bool {
 	cacheDir := h.getCacheDir()
 	if cacheDir != "" {
-		// make room
-		n, _ := strconv.Atoi(img.img.SizeK)
-		h.cache.pruneCache(h.getCacheSize()-(n<<10), nil, nil)
+		h.cache.pruneCache(h.getCacheSize()-(img.img.SizeK<<10), nil, nil)
 	}
 
 	ifile := img.getImageFilePath(h.getPkgdir())

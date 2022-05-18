@@ -12,12 +12,12 @@ import (
 type buildReport struct {
 	*buildHelper
 
-	needCollectOrigins bool
-	kiwiOrigins        map[string][]string
+	kiwiOrigins    map[string][]string
+	collectOrigins bool
 }
 
 func (b *buildReport) setKiwiOrigin(k, v string) {
-	if !b.needCollectOrigins {
+	if !b.collectOrigins {
 		return
 	}
 
@@ -33,7 +33,7 @@ func (b *buildReport) setKiwiOrigin(k, v string) {
 }
 
 func (b *buildReport) do(dir string) {
-	if !b.needCollectOrigins {
+	if !b.collectOrigins {
 		return
 	}
 

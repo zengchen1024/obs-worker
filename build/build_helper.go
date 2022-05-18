@@ -11,10 +11,11 @@ import (
 )
 
 type buildHelper struct {
-	cfg  *Config
-	hc   utils.HttpClient
-	info BuildInfo
-	env  buildEnv
+	cfg     *Config
+	hc      utils.HttpClient
+	info    BuildInfo
+	env     buildEnv
+	workDir string
 }
 
 func (h *buildHelper) gethc() *utils.HttpClient {

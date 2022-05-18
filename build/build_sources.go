@@ -18,11 +18,6 @@ type buildSources struct {
 
 func (b *buildSources) getSource() (string, error) {
 	srcdir := b.getSrcdir()
-
-	if err := mkdir(srcdir); err != nil {
-		return "", err
-	}
-
 	info := b.getBuildInfo()
 
 	v, err := b.downloadPkgSource(
@@ -126,13 +121,15 @@ func (b *buildSources) downloadPkgSource(project, pkg, srcmd5, endpoint, saveTo 
 }
 
 func (b *buildSources) downloadSSLCert() error {
-	v, err := sslcert.List(b.gethc(), b.getSrcServer(), b.info.Project, true)
+	v, err := sslcert.List(
+		b.gethc(),
+		b.getSrcServer(), b.getBuildInfo().Project, true,
+	)
 	if err != nil || len(v) == 0 {
 		return err
 	}
 
 	return utils.WriteFile(
-		filepath.Join(b.getSrcdir(), "_projectcert.crt"),
-		v,
+		filepath.Join(b.getSrcdir(), "_projectcert.crt"), v,
 	)
 }

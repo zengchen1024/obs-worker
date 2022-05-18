@@ -145,15 +145,10 @@ func mkdirAll(dir string) error {
 	return os.MkdirAll(dir, os.FileMode(0777))
 }
 
-func cleanDir(dir string) {
-	d, err := os.ReadDir(dir)
-	if err != nil {
-		return
-	}
+func cleanDir(dir string) error {
+	os.RemoveAll(dir)
 
-	for _, item := range d {
-		os.RemoveAll(filepath.Join(dir, item.Name()))
-	}
+	return mkdir(dir)
 }
 
 func lsDirs(dir string) []string {
