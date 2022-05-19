@@ -37,7 +37,13 @@ func (b *nonModeBinary) getBinaries(considerPreInstallImg bool) ([]string, error
 	var imageBins map[string]string
 
 	if considerPreInstallImg {
-		imageBins, imagesWithMeta = b.filterByPreInstallImage(todo)
+		imageBins, imagesWithMeta = b.getPreInstallImage(todo)
+
+		for k := range todo {
+			if _, ok := imageBins[k]; ok {
+				todo.Delete(k)
+			}
+		}
 	}
 
 	done, metas := b.getBinaryCache(todo)
@@ -54,7 +60,7 @@ func (b *nonModeBinary) getBinaries(considerPreInstallImg bool) ([]string, error
 	return b.genMetaData(done, imageBins, imagesWithMeta)
 }
 
-func (b *nonModeBinary) filterByPreInstallImage(todo sets.String) (
+func (b *nonModeBinary) getPreInstallImage(todo sets.String) (
 	imageBins map[string]string,
 	imagesWithMeta sets.String,
 ) {
@@ -71,12 +77,6 @@ func (b *nonModeBinary) filterByPreInstallImage(todo sets.String) (
 
 	if b.handleOutBDep != nil {
 		//TODO
-	}
-
-	for k := range todo {
-		if _, ok := imageBins[k]; ok {
-			todo.Delete(k)
-		}
 	}
 
 	return

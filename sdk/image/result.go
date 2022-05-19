@@ -11,11 +11,11 @@ import (
 
 type Image struct {
 	SizeK   int      `json:"sizek"`
-	Prpa    string   `json:"prpa" required:"true"`
-	File    string   `json:"file" required:"true"`
-	Path    string   `json:"path" required:"true"`
+	Prpa    string   `json:"prpa"`
+	File    string   `json:"file"`
+	Path    string   `json:"path"`
 	HdrMD5  string   `json:"hdrmd5"`
-	Package string   `json:"package" required:"true"`
+	Package string   `json:"package"`
 	HdrMD5s []string `json:"hdrmd5s"`
 }
 
