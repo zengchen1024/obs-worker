@@ -48,7 +48,6 @@ func (b *binaryManager) get(dir string, repo *RepoPath, bins []string) (map[stri
 	}
 
 	cacheDir := b.getCacheDir()
-
 	var newCaches []cacheBin
 
 	if n := len(toDownload); n > 0 {
@@ -226,14 +225,14 @@ func (h *binaryManagerHelper) getDownloads(
 			continue
 		}
 
-		useCache, haveMeta, file := h.checkInCache(binName, bin)
+		useCache, haveMeta, binFile := h.checkInCache(binName, bin)
 
 		if !useCache {
 			toDownload = append(toDownload, binName)
 			size += bin.SizeK
 		} else {
-			if stat, err := os.Stat(file); err != nil {
-				utils.LogErr("stat file:%s, err:%v\n", file, err)
+			if stat, err := os.Stat(binFile); err != nil {
+				utils.LogErr("stat file:%s, err:%v\n", binFile, err)
 			} else {
 				oldCache = append(oldCache, cacheBinInfo{
 					Id:   genCacheId(h.prpa, bin.HdrMD5),
@@ -255,7 +254,7 @@ func (h *binaryManagerHelper) getDownloads(
 func (h *binaryManagerHelper) checkInCache(binName string, bin *binary.Binary) (
 	useCache bool,
 	haveMeta bool,
-	file string,
+	binFile string,
 ) {
 	cacheDir := h.getCacheDir()
 	if cacheDir == "" {
@@ -271,7 +270,7 @@ func (h *binaryManagerHelper) checkInCache(binName string, bin *binary.Binary) (
 	useCache, haveMeta = h.checkMetaInCache(binName, cacheFile, bin)
 
 	if useCache && queryHdrmd5(to) == bin.HdrMD5 {
-		file = to
+		binFile = to
 
 		return
 	}
@@ -324,7 +323,8 @@ func (h *binaryManagerHelper) download(toDownload []string) ([]cacheBin, error) 
 
 	res, err := binary.Download(h.gethc(), h.repoServer, &opts, h.dir)
 	if err != nil {
-		utils.LogErr("call api of getbinaries, err:%v\n", err)
+		utils.LogErr("call api of getbinaries, err: %s", err)
+
 		return nil, err
 	}
 
@@ -339,28 +339,25 @@ func (h *binaryManagerHelper) download(toDownload []string) ([]cacheBin, error) 
 
 			stat, err := os.Stat(tmp)
 			if err != nil {
-				utils.LogErr("stat %s, err:%v\n", tmp, err)
+				utils.LogErr("stat %s, err: %s", tmp, err.Error())
 
 				continue
 			}
 
 			md5, err := utils.GenMd5OfFile(tmp)
 			if err != nil {
-				utils.LogErr("gen md5 of %s, err:%v\n", tmp, err)
+				utils.LogErr("gen md5 of %s, err: %s", tmp, err.Error())
 
 				continue
 			}
 
-			newCaches = append(
-				newCaches,
-				cacheBin{
-					cacheBinInfo: cacheBinInfo{
-						Id:   genCacheId(h.prpa, md5),
-						Size: int(stat.Size()),
-					},
-					binFile: tmp,
+			newCaches = append(newCaches, cacheBin{
+				cacheBinInfo: cacheBinInfo{
+					Id:   genCacheId(h.prpa, md5),
+					Size: int(stat.Size()),
 				},
-			)
+				binFile: tmp,
+			})
 
 			h.binaries[bin] = binaryInfo{
 				name:   name,

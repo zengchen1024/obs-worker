@@ -99,6 +99,7 @@ func (b *nonModeBinary) getBinaryCache(bins sets.String) (map[string]string, set
 		)
 		if err != nil {
 			utils.LogErr("get binary with cache, err:%v\n", err)
+
 			continue
 		}
 
