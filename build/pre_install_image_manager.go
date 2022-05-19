@@ -251,6 +251,7 @@ func (h *preInstallImageManager) findBestImage(
 			continue
 		}
 
+		// for building preinstall images, it needs at least one new package to avoid cycles
 		if isPre && sets.NewString(img.HdrMD5s...).HasAll(neededHdrmd5sList...) {
 			continue
 		}
@@ -356,6 +357,7 @@ func (h *preInstallImageManager) downloadImage(
 			},
 		)
 
+		// fake meta. help to update cache.
 		os.Remove(tmp)
 	}
 
