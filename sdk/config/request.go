@@ -35,7 +35,7 @@ func (o *DownloadOpts) toQuery() (string, error) {
 	return q.Encode(), nil
 }
 
-func Download(hc *utils.HttpClient, endpoint string, opts *DownloadOpts, saveTo string) error {
+func Download(endpoint string, opts *DownloadOpts, saveTo string) error {
 	q, err := opts.toQuery()
 	if err != nil {
 		return err
@@ -55,5 +55,5 @@ func Download(hc *utils.HttpClient, endpoint string, opts *DownloadOpts, saveTo 
 		return filereceiver.ReceiveFile(h, r, saveTo)
 	}
 
-	return hc.ForwardTo(req, handle)
+	return utils.ForwardTo(req, handle)
 }

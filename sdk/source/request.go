@@ -26,7 +26,7 @@ func (l *ListOpts) toMap() (map[string]string, error) {
 	return v, err
 }
 
-func List(hc *utils.HttpClient, endpoint string, opts *ListOpts, check filereceiver.CPIOPreCheck) (meta []filereceiver.CPIOFileMeta, err error) {
+func List(endpoint string, opts *ListOpts, check filereceiver.CPIOPreCheck) (meta []filereceiver.CPIOFileMeta, err error) {
 	p, err := opts.toMap()
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func List(hc *utils.HttpClient, endpoint string, opts *ListOpts, check filerecei
 		return err
 	}
 
-	err = hc.ForwardTo(req, handle)
+	err = utils.ForwardTo(req, handle)
 
 	return
 }

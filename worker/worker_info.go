@@ -20,7 +20,7 @@ func (b *BuildManager) sendIdleState() {
 
 		b.w.RegisterServer = server
 
-		if err := worker.Create(&b.hc, server, &opts, &b.w); err != nil {
+		if err := worker.Create(server, &opts, &b.w); err != nil {
 			utils.LogErr("send %s state, err:%v", state, err)
 		}
 	}
@@ -31,7 +31,7 @@ func (b *BuildManager) sendExitState() {
 	opts := b.genWorkerStateOpts(state)
 
 	for _, server := range b.cfg.RepoServers {
-		if err := worker.Get(&b.hc, server, &opts); err != nil {
+		if err := worker.Get(server, &opts); err != nil {
 			utils.LogErr("send %s state, err:%v", state, err)
 		}
 	}
@@ -46,7 +46,7 @@ func (b *BuildManager) sendBuildingState(excludedServer string) {
 			continue
 		}
 
-		if err := worker.Get(&b.hc, server, &opts); err != nil {
+		if err := worker.Get(server, &opts); err != nil {
 			utils.LogErr("send %s state, err:%v", state, err)
 		}
 	}

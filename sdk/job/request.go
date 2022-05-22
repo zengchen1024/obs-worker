@@ -56,7 +56,7 @@ type File struct {
 	Path string
 }
 
-func Put(hc *utils.HttpClient, endpoint string, opts Opts, files []File) (err error) {
+func Put(endpoint string, opts Opts, files []File) (err error) {
 	s, err := opts.toQuery()
 	if err != nil {
 		return
@@ -67,10 +67,10 @@ func Put(hc *utils.HttpClient, endpoint string, opts Opts, files []File) (err er
 		return
 	}
 
-	return upload(hc, urlStr, files)
+	return upload(urlStr, files)
 }
 
-func upload(hc *utils.HttpClient, urlStr string, files []File) error {
+func upload(urlStr string, files []File) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -95,7 +95,7 @@ func upload(hc *utils.HttpClient, urlStr string, files []File) error {
 	req.Header.Set("Transfer-Encoding", "chunked")
 	req.Header.Set("Content-Type", "application/x-cpio")
 
-	return hc.ForwardTo(req, nil)
+	return utils.ForwardTo(req, nil)
 }
 
 func write(ctx context.Context, w io.Writer, files []File) {

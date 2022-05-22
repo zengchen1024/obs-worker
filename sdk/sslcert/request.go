@@ -7,7 +7,7 @@ import (
 	"github.com/zengchen1024/obs-worker/utils"
 )
 
-func List(hc *utils.HttpClient, endpoint, project string, autoExtend bool) (
+func List(endpoint, project string, autoExtend bool) (
 	cert []byte, err error,
 ) {
 	p := map[string]string{
@@ -32,7 +32,7 @@ func List(hc *utils.HttpClient, endpoint, project string, autoExtend bool) (
 		return err
 	}
 
-	err = hc.ForwardTo(req, handle)
+	err = utils.ForwardTo(req, handle)
 
 	return
 }

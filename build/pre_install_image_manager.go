@@ -145,7 +145,7 @@ func (h *preInstallImageManager) getBinary(repo *RepoPath, bins []string) (
 
 	endpoint := info.getRepoServer(repo)
 
-	v, err := binary.List(h.gethc(), endpoint, &opts)
+	v, err := binary.List(endpoint, &opts)
 
 	return v, endpoint, err
 }
@@ -167,7 +167,7 @@ func (h *preInstallImageManager) getImagesFromRepo(
 
 	for endpoint, prpa := range prpas {
 		v, err := image.Post(
-			h.gethc(), endpoint,
+			endpoint,
 			&image.QueryOpts{
 				Prpa: prpa,
 			},
@@ -329,7 +329,7 @@ func (h *preInstallImageManager) downloadImage(
 	ifile := img.getImageFilePath(h.getPkgdir())
 	os.Remove(ifile)
 
-	if err := img.download(h.gethc(), ifile); err != nil {
+	if err := img.download(ifile); err != nil {
 		return false
 	}
 
@@ -493,7 +493,6 @@ func (h *preInstallImageManager) downloadBinaries(todo sets.String) ([]string, e
 	}
 
 	res, err := binary.Download(
-		h.gethc(),
 		info.fetchRepoServer(), &opts, h.getPkgdir(),
 	)
 
@@ -526,6 +525,6 @@ func (b *imageInfo) getImageFilePath(dir string) string {
 	return filepath.Join(dir, getImageFile(b.img))
 }
 
-func (b *imageInfo) download(hc *utils.HttpClient, saveTo string) error {
-	return image.Download(hc, b.loadFrom, b.img.Prpa, b.img.Path, saveTo)
+func (b *imageInfo) download(saveTo string) error {
+	return image.Download(b.loadFrom, b.img.Prpa, b.img.Path, saveTo)
 }

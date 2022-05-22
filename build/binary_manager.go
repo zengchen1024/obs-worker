@@ -154,7 +154,6 @@ func (h *binaryManagerHelper) listBinaries(bins []string) (binary.BinaryVersionL
 	opts.Binaries = bins
 
 	v, err := binary.List(
-		h.gethc(),
 		h.repoServer,
 		&binary.ListOpts{
 			CommonOpts: opts,
@@ -321,7 +320,7 @@ func (h *binaryManagerHelper) download(toDownload []string) ([]cacheBin, error) 
 	}
 	opts.Binaries = toDownload
 
-	res, err := binary.Download(h.gethc(), h.repoServer, &opts, h.dir)
+	res, err := binary.Download(h.repoServer, &opts, h.dir)
 	if err != nil {
 		utils.LogErr("call api of getbinaries, err: %s", err)
 

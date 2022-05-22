@@ -28,7 +28,7 @@ func (l *QueryOpts) toQuery() (string, error) {
 	return q.Encode(), nil
 }
 
-func Post(hc *utils.HttpClient, endpoint string, opts *QueryOpts, data []byte, workDir string) (images []Image, err error) {
+func Post(endpoint string, opts *QueryOpts, data []byte, workDir string) (images []Image, err error) {
 	q, err := opts.toQuery()
 	if err != nil {
 		return
@@ -62,12 +62,12 @@ func Post(hc *utils.HttpClient, endpoint string, opts *QueryOpts, data []byte, w
 		return err
 	}
 
-	err = hc.ForwardTo(req, handle)
+	err = utils.ForwardTo(req, handle)
 
 	return
 }
 
-func Download(hc *utils.HttpClient, endpoint, prpa, path, saveTo string) error {
+func Download(endpoint, prpa, path, saveTo string) error {
 	urlStr, err := utils.GenURL(endpoint+fmt.Sprintf("/build/%s/%s", prpa, path), "")
 	if err != nil {
 		return err
@@ -82,5 +82,5 @@ func Download(hc *utils.HttpClient, endpoint, prpa, path, saveTo string) error {
 		return filereceiver.ReceiveFile(h, r, saveTo)
 	}
 
-	return hc.ForwardTo(req, handle)
+	return utils.ForwardTo(req, handle)
 }

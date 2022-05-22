@@ -13,7 +13,6 @@ import (
 
 type buildHelper struct {
 	cfg     *Config
-	hc      utils.HttpClient
 	info    BuildInfo
 	env     buildEnv
 	workDir string
@@ -37,10 +36,6 @@ func (h *buildHelper) isCancel() bool {
 
 func (h *buildHelper) setCancel() {
 	h.once.Do(func() { close(h.cancel) })
-}
-
-func (h *buildHelper) gethc() *utils.HttpClient {
-	return &h.hc
 }
 
 func (h *buildHelper) getBuildInfo() *BuildInfo {
@@ -77,7 +72,6 @@ func (h *buildHelper) getSrcdir() string {
 
 func (b *buildHelper) downloadProjectConfig() error {
 	return config.Download(
-		&b.hc,
 		b.getSrcServer(),
 		&config.DownloadOpts{
 			Project:    b.info.Project,
