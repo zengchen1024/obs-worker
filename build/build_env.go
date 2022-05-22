@@ -50,11 +50,17 @@ func (env *buildEnv) init(cfg *Config) error {
 	os.Remove(env.logFile)
 	utils.WriteFile(env.logFile, nil)
 
-	os.RemoveAll(env.srcdir)
+	if err := cleanDir(env.srcdir); err != nil {
+		return err
+	}
+
+	if err := cleanDir(env.pkgdir); err != nil {
+		return err
+	}
+
 	os.RemoveAll(env.oldpkgdir)
 
-	cleanDir(env.pkgdir)
-
+	// obs-build/build need this env
 	return os.Setenv("BUILD_DIR", filepath.Join(cfg.StateDir, "build"))
 }
 

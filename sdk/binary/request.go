@@ -96,9 +96,7 @@ func List(hc *utils.HttpClient, endpoint string, opts *ListOpts) (binaries Binar
 			return err
 		}
 
-		binaries, err = extract(b)
-
-		return err
+		return binaries.extract(b)
 	}
 
 	err = hc.ForwardTo(req, handle)

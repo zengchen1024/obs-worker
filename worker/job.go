@@ -101,8 +101,8 @@ func (b *BuildManager) createJob(registerServer string, j *Job) error {
 	}
 	b.sendBuildingState(registerServer)
 
+	b.wg.Add(1)
 	go func() {
-		b.wg.Add(1)
 		defer b.wg.Done()
 
 		b.runJob(j.Id, job)
@@ -112,8 +112,12 @@ func (b *BuildManager) createJob(registerServer string, j *Job) error {
 }
 
 func (b *BuildManager) runJob(jobId string, job build.Build) {
-	if err := job.DoBuild(jobId); err != nil {
+	if _, err := job.DoBuild(jobId); err != nil {
 		utils.LogErr("do build job:%s, err:%s", jobId, err.Error())
+
+		stage := job.GetBuildStage()
+		switch stage {
+		}
 	}
 
 	b.lock.Lock()

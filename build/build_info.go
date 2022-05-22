@@ -106,6 +106,16 @@ func (b *BuildInfo) getRepoServer(repo *RepoPath) string {
 	return b.RepoServer
 }
 
+func (b *BuildInfo) fetchRepoServer() string {
+	for _, v := range b.Paths {
+		if v.Project == b.Project && v.Repository == b.Repository && v.Server != "" {
+			return v.Server
+		}
+	}
+
+	return b.RepoServer
+}
+
 func (b *BuildInfo) getPrpaOfRepo(repo *RepoPath) string {
 	return genPrpa(repo.Project, repo.Repository, b.Arch)
 }

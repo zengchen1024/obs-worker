@@ -13,12 +13,10 @@ func getImageFile(img *image.Image) string {
 }
 
 type preInstallImage struct {
-	hdrmd5s map[string]string
-
-	img image.Image
-
-	imagesWithMeta sets.String
+	img            image.Image
+	hdrmd5s        map[string]string
 	imageOrigins   map[string]string
+	imagesWithMeta sets.String
 }
 
 func (p *preInstallImage) isEmpty() bool {

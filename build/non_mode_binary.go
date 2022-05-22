@@ -23,12 +23,6 @@ type nonModeBinary struct {
 }
 
 func (b *nonModeBinary) getBinaries(considerPreInstallImg bool) ([]string, error) {
-	if dir := b.getPkgdir(); !isFileExist(dir) {
-		if err := mkdir(dir); err != nil {
-			return nil, err
-		}
-	}
-
 	v := b.getBuildInfo().getNotSrcBDep()
 	if len(v) == 0 {
 		return nil, fmt.Errorf("no binaries needed for this package")
@@ -43,7 +37,13 @@ func (b *nonModeBinary) getBinaries(considerPreInstallImg bool) ([]string, error
 	var imageBins map[string]string
 
 	if considerPreInstallImg {
-		imageBins, imagesWithMeta = b.filterByPreInstallImage(todo)
+		imageBins, imagesWithMeta = b.getPreInstallImage(todo)
+
+		for k := range imageBins {
+			if todo.Has(k) {
+				todo.Delete(k)
+			}
+		}
 	}
 
 	done, metas := b.getBinaryCache(todo)
@@ -60,7 +60,7 @@ func (b *nonModeBinary) getBinaries(considerPreInstallImg bool) ([]string, error
 	return b.genMetaData(done, imageBins, imagesWithMeta)
 }
 
-func (b *nonModeBinary) filterByPreInstallImage(todo sets.String) (
+func (b *nonModeBinary) getPreInstallImage(todo sets.String) (
 	imageBins map[string]string,
 	imagesWithMeta sets.String,
 ) {
@@ -77,12 +77,6 @@ func (b *nonModeBinary) filterByPreInstallImage(todo sets.String) (
 
 	if b.handleOutBDep != nil {
 		//TODO
-	}
-
-	for k := range todo {
-		if _, ok := imageBins[k]; ok {
-			todo.Delete(k)
-		}
 	}
 
 	return
@@ -104,7 +98,8 @@ func (b *nonModeBinary) getBinaryCache(bins sets.String) (map[string]string, set
 			b.getPkgdir(), repo, bins.UnsortedList(),
 		)
 		if err != nil {
-			utils.LogErr("get binary with cache, err:%v\n", err)
+			utils.LogErr("get binary with cache, err: %s", err.Error())
+
 			continue
 		}
 
@@ -146,6 +141,9 @@ func (b *nonModeBinary) genMetaData(
 
 	sort.Strings(bdeps)
 
+	if imageBins == nil {
+		imageBins = make(map[string]string)
+	}
 	dir := b.getPkgdir()
 	getMd5 := func(bdep string) string {
 		if v := imageBins[bdep]; v != "" {
@@ -198,14 +196,17 @@ func (b *nonModeBinary) genMetaData(
 	return genMeta(meta, info.SubPacks, info.GenMetaAlgo), nil
 }
 
-func (b *nonModeBinary) parseMetaFile(dep, file, currentPkg string, isSubpack func(string) bool) ([]buildMeta, error) {
+func (b *nonModeBinary) parseMetaFile(
+	dep, file, currentPkg string,
+	isSubpack func(string) bool,
+) ([]buildMeta, error) {
 	if v, err := isEmptyFile(file); v || err != nil {
 		return nil, err
 	}
 
-	isNotSubpack := !isSubpack(fmt.Sprintf("/%s/", dep))
 	seen := sets.NewString()
 	firstLine := true
+	isNotSubpack := !isSubpack(fmt.Sprintf("/%s/", dep))
 
 	meta := []buildMeta{}
 	add := func(md5, path string) {
@@ -216,7 +217,6 @@ func (b *nonModeBinary) parseMetaFile(dep, file, currentPkg string, isSubpack fu
 	}
 
 	handle := func(line string) bool {
-		line = strings.TrimRight(line, "\n") // need it?
 		md5, pkg := splitMetaLine(line)
 
 		if firstLine {

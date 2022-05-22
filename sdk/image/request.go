@@ -28,7 +28,7 @@ func (l *QueryOpts) toQuery() (string, error) {
 	return q.Encode(), nil
 }
 
-func Post(hc *utils.HttpClient, endpoint string, opts *QueryOpts, data []byte) (images []Image, err error) {
+func Post(hc *utils.HttpClient, endpoint string, opts *QueryOpts, data []byte, workDir string) (images []Image, err error) {
 	q, err := opts.toQuery()
 	if err != nil {
 		return
@@ -57,7 +57,7 @@ func Post(hc *utils.HttpClient, endpoint string, opts *QueryOpts, data []byte) (
 			return err
 		}
 
-		images, err = extract(b)
+		images, err = extract(b, workDir)
 
 		return err
 	}

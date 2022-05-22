@@ -36,9 +36,10 @@ func (b *binaryManager) setKnownBins(prpa string, bins binary.BinaryVersionList)
 
 func (b *binaryManager) get(dir string, repo *RepoPath, bins []string) (map[string]binaryInfo, error) {
 	h := &binaryManagerHelper{
+		dir:         dir,
 		buildHelper: b.buildHelper,
 	}
-	h.init(dir, repo)
+	h.init(repo)
 
 	oldCache, toDownload, total := h.getDownloads(bins, b.knowns)
 
@@ -47,7 +48,6 @@ func (b *binaryManager) get(dir string, repo *RepoPath, bins []string) (map[stri
 	}
 
 	cacheDir := b.getCacheDir()
-
 	var newCaches []cacheBin
 
 	if n := len(toDownload); n > 0 {
@@ -80,31 +80,38 @@ func (b *binaryManager) get(dir string, repo *RepoPath, bins []string) (map[stri
 type binaryManagerHelper struct {
 	*buildHelper
 
-	commonOpts binary.CommonOpts
+	nometa     bool
 	dir        string
 	prpa       string
+	project    string
+	repository string
 	repoServer string
-	nometa     bool
 
 	binaries map[string]binaryInfo
 }
 
-func (h *binaryManagerHelper) init(dir string, repo *RepoPath) {
+func (h *binaryManagerHelper) init(repo *RepoPath) {
+	info := h.getBuildInfo()
+	h.prpa = info.getPrpaOfRepo(repo)
+	h.nometa = info.isRepoNoMeta(repo)
+	h.repoServer = info.getRepoServer(repo)
+
+	h.project = repo.Project
+	h.repository = repo.Repository
+
+	h.binaries = make(map[string]binaryInfo)
+}
+
+func (h *binaryManagerHelper) genCommonOpts() binary.CommonOpts {
 	info := h.getBuildInfo()
 
-	h.commonOpts = binary.CommonOpts{
+	return binary.CommonOpts{
 		WorkerId:   h.cfg.Id,
-		Project:    repo.Project,
-		Repository: repo.Repository,
+		Project:    h.project,
+		Repository: h.repository,
 		Arch:       info.Arch,
 		Modules:    info.Modules,
 	}
-
-	h.dir = dir
-	h.prpa = info.getPrpaOfRepo(repo)
-	h.nometa = info.isRepoNoMeta(repo)
-	h.binaries = make(map[string]binaryInfo)
-	h.repoServer = info.getRepoServer(repo)
 }
 
 func (h *binaryManagerHelper) getBinaries() map[string]binaryInfo {
@@ -143,7 +150,7 @@ func (h *binaryManagerHelper) toBinaryMap(bl []binary.Binary) map[string]*binary
 }
 
 func (h *binaryManagerHelper) listBinaries(bins []string) (binary.BinaryVersionList, error) {
-	opts := h.commonOpts
+	opts := h.genCommonOpts()
 	opts.Binaries = bins
 
 	v, err := binary.List(
@@ -156,7 +163,7 @@ func (h *binaryManagerHelper) listBinaries(bins []string) (binary.BinaryVersionL
 	)
 
 	if err != nil {
-		utils.LogErr("getbinaryversions, err:%v\n", err)
+		utils.LogErr("getbinaryversions, err: %s", err.Error())
 	}
 
 	return v, err
@@ -171,19 +178,15 @@ func (h *binaryManagerHelper) checkByKnowns(
 	}
 
 	if v, ok := knowns[h.prpa]; ok {
-		hasAll := true
 		bv := h.toBinaryMap(v.Binaries)
 
 		for _, k := range bins {
 			if _, ok := bv[k]; !ok {
-				hasAll = false
-				break
+				return nil
 			}
 		}
 
-		if hasAll {
-			return bv
-		}
+		return bv
 	}
 
 	return nil
@@ -206,6 +209,12 @@ func (h *binaryManagerHelper) getDownloads(
 		}
 	}
 
+	if len(bv) == 0 {
+		toDownload = bins
+
+		return
+	}
+
 	for _, binName := range bins {
 		bin, ok := bv[binName]
 		if !ok {
@@ -216,13 +225,20 @@ func (h *binaryManagerHelper) getDownloads(
 			continue
 		}
 
-		useCache, haveMeta, cache := h.checkInCache(binName, bin)
+		useCache, haveMeta, binFile := h.checkInCache(binName, bin)
 
 		if !useCache {
 			toDownload = append(toDownload, binName)
 			size += bin.SizeK
 		} else {
-			oldCache = append(oldCache, cache)
+			if stat, err := os.Stat(binFile); err != nil {
+				utils.LogErr("stat file:%s, err:%v\n", binFile, err)
+			} else {
+				oldCache = append(oldCache, cacheBinInfo{
+					Id:   genCacheId(h.prpa, bin.HdrMD5),
+					Size: int(stat.Size()),
+				})
+			}
 
 			h.binaries[binName] = binaryInfo{
 				name:    bin.Name,
@@ -238,51 +254,23 @@ func (h *binaryManagerHelper) getDownloads(
 func (h *binaryManagerHelper) checkInCache(binName string, bin *binary.Binary) (
 	useCache bool,
 	haveMeta bool,
-	cache cacheBinInfo,
+	binFile string,
 ) {
 	cacheDir := h.getCacheDir()
 	if cacheDir == "" {
 		return
 	}
-
-	cacheId := genCacheId(h.prpa, bin.HdrMD5)
-	cacheFile := genCacheFile(cacheDir, cacheId)
+	cacheFile := genCacheFile(cacheDir, genCacheId(h.prpa, bin.HdrMD5))
 
 	to := filepath.Join(h.dir, bin.Name)
 	if nil != linkOrCopy(cacheFile, to) {
 		return
 	}
 
-	useCache = true
-
-	if !h.nometa && bin.HdrMD5 != "" {
-		tmp := filepath.Join(h.dir, binName+".meta")
-
-		if nil == linkOrCopy(cacheFile+".meta", tmp) {
-			md5, err := utils.GenMd5OfFile(tmp)
-			if err != nil {
-				utils.LogErr("gen md5 of file:%s, err:%v\n", tmp, err)
-			}
-
-			if md5 == bin.MetaMD5 {
-				haveMeta = true
-			} else {
-				os.Remove(tmp)
-			}
-		}
-
-		if !haveMeta {
-			useCache = false
-		}
-	}
+	useCache, haveMeta = h.checkMetaInCache(binName, cacheFile, bin)
 
 	if useCache && queryHdrmd5(to) == bin.HdrMD5 {
-		stat, err := os.Stat(to)
-		if err != nil {
-			utils.LogErr("stat file:%s, err:%v\n", to, err)
-		} else {
-			cache = cacheBinInfo{cacheId, int(stat.Size())}
-		}
+		binFile = to
 
 		return
 	}
@@ -293,15 +281,50 @@ func (h *binaryManagerHelper) checkInCache(binName string, bin *binary.Binary) (
 	return
 }
 
+func (h *binaryManagerHelper) checkMetaInCache(binName, cacheFile string, bin *binary.Binary) (
+	useCache bool,
+	haveMeta bool,
+) {
+	if h.nometa || bin.HdrMD5 == "" {
+		useCache = true
+
+		return
+	}
+
+	tmp := filepath.Join(h.dir, binName+".meta")
+	if nil != linkOrCopy(cacheFile+".meta", tmp) {
+		return
+	}
+
+	if md5, err := utils.GenMd5OfFile(tmp); err != nil {
+		utils.LogErr(
+			"gen md5 of file: %s, err: %s",
+			tmp, err.Error(),
+		)
+	} else {
+		if md5 == bin.MetaMD5 {
+			useCache = true
+			haveMeta = true
+
+			return
+		}
+	}
+
+	os.Remove(tmp)
+
+	return
+}
+
 func (h *binaryManagerHelper) download(toDownload []string) ([]cacheBin, error) {
 	opts := binary.DownloadOpts{
-		CommonOpts: h.commonOpts,
+		CommonOpts: h.genCommonOpts(),
 	}
 	opts.Binaries = toDownload
 
 	res, err := binary.Download(h.gethc(), h.repoServer, &opts, h.dir)
 	if err != nil {
-		utils.LogErr("call api of getbinaries, err:%v\n", err)
+		utils.LogErr("call api of getbinaries, err: %s", err)
+
 		return nil, err
 	}
 
@@ -316,28 +339,25 @@ func (h *binaryManagerHelper) download(toDownload []string) ([]cacheBin, error) 
 
 			stat, err := os.Stat(tmp)
 			if err != nil {
-				utils.LogErr("stat %s, err:%v\n", tmp, err)
+				utils.LogErr("stat %s, err: %s", tmp, err.Error())
 
 				continue
 			}
 
 			md5, err := utils.GenMd5OfFile(tmp)
 			if err != nil {
-				utils.LogErr("gen md5 of %s, err:%v\n", tmp, err)
+				utils.LogErr("gen md5 of %s, err: %s", tmp, err.Error())
 
 				continue
 			}
 
-			newCaches = append(
-				newCaches,
-				cacheBin{
-					cacheBinInfo: cacheBinInfo{
-						Id:   genCacheId(h.prpa, md5),
-						Size: int(stat.Size()),
-					},
-					binFile: tmp,
+			newCaches = append(newCaches, cacheBin{
+				cacheBinInfo: cacheBinInfo{
+					Id:   genCacheId(h.prpa, md5),
+					Size: int(stat.Size()),
 				},
-			)
+				binFile: tmp,
+			})
 
 			h.binaries[bin] = binaryInfo{
 				name:   name,

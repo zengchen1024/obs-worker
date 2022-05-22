@@ -62,19 +62,14 @@ type cacheManager struct {
 	setCacheScript   string
 }
 
-func (c *cacheManager) init() error {
-	dir, err := os.Getwd()
-	if err != nil {
-		return err
-	}
+func (c *cacheManager) init(h *buildHelper) {
+	c.buildHelper = h
 
-	dir = filepath.Join(dir, "perl")
+	dir := filepath.Join(h.workDir, "perl")
 
 	c.perlScriptDir = dir
 	c.parseCacheScript = filepath.Join(dir, "parse_cache_content.pm")
 	c.setCacheScript = filepath.Join(dir, "store_cache_content.pm")
-
-	return nil
 }
 
 func (c *cacheManager) getCurrentCacheInfo(cf utils.FileOp) ([]cacheBinInfo, error) {

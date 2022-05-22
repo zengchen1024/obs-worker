@@ -25,18 +25,22 @@ type nonModeBuid struct {
 	cache         cacheManager
 	oldpkg        buildOldPackages
 
+	stage          string
 	needOBSPackage bool
 }
 
-func newNonModeBuild(cfg *Config, info *buildinfo.BuildInfo) (*nonModeBuid, error) {
+func newNonModeBuild(workDir string, cfg *Config, info *buildinfo.BuildInfo) (*nonModeBuid, error) {
 	b := nonModeBuid{
 		buildHelper: buildHelper{
-			cfg:  cfg,
-			info: BuildInfo{BuildInfo: *info},
+			cfg:     cfg,
+			info:    BuildInfo{BuildInfo: *info},
+			workDir: workDir,
 		},
+		stage: BuildStagePrepare,
 	}
 
 	h := &b.buildHelper
+	h.init()
 
 	b.sources = buildSources{h}
 
@@ -48,12 +52,8 @@ func newNonModeBuild(cfg *Config, info *buildinfo.BuildInfo) (*nonModeBuid, erro
 		buildHelper: h,
 	}
 
-	b.cache = cacheManager{
-		buildHelper: h,
-	}
-	if err := b.cache.init(); err != nil {
-		return nil, err
-	}
+	b.cache = cacheManager{}
+	b.cache.init(h)
 
 	b.oldpkg = buildOldPackages{
 		buildHelper:           h,
@@ -91,7 +91,7 @@ func newNonModeBuild(cfg *Config, info *buildinfo.BuildInfo) (*nonModeBuid, erro
 	return &b, nil
 }
 
-func (b *nonModeBuid) DoBuild(jobId string) error {
+func (b *nonModeBuid) preBuild() error {
 	if err := b.env.init(b.cfg); err != nil {
 		return err
 	}
@@ -121,10 +121,21 @@ func (b *nonModeBuid) DoBuild(jobId string) error {
 		return err
 	}
 
-	_, err := b.build.do()
-	if err != nil {
-		return err
+	return nil
+}
+
+func (b *nonModeBuid) DoBuild(jobId string) (int, error) {
+	if err := b.preBuild(); err != nil {
+		return 0, err
 	}
+
+	b.stage = BuildStageBuilding
+
+	if c, err := b.build.do(); err != nil {
+		return c, err
+	}
+
+	b.stage = BuildStagePostBuild
 
 	dir := b.env.otherDir
 
@@ -138,7 +149,7 @@ func (b *nonModeBuid) DoBuild(jobId string) error {
 
 	b.postBuild(jobId)
 
-	return nil
+	return 0, nil
 }
 
 func (b *nonModeBuid) setBuildInfoOut() {
@@ -177,7 +188,7 @@ func (b *nonModeBuid) fetchSources() error {
 	}
 
 	if ignoreImage {
-		b.report.needCollectOrigins = true
+		b.report.collectOrigins = true
 	}
 
 	v, err := b.binaryLoader.getBinaries(!ignoreImage)
@@ -204,6 +215,7 @@ func (b *nonModeBuid) parseBuildFile() (
 
 	readFileLineByLine(filename, func(line string) bool {
 		bs := []byte(line)
+
 		if re0.Match(bs) {
 			ignoreImage = true
 		}
@@ -226,6 +238,7 @@ func (b *nonModeBuid) parseBuildFile() (
 	if needOBSPackage {
 		b.build.needOBSPackage = true
 	}
+
 	return
 }
 
@@ -233,7 +246,15 @@ func (b *nonModeBuid) GetBuildInfo() *buildinfo.BuildInfo {
 	return &b.info.BuildInfo
 }
 
-func (b *nonModeBuid) Kill()                  {}
+func (b *nonModeBuid) Kill() error {
+	b.setCancel()
+	return b.build.kill()
+}
+
+func (b *nonModeBuid) GetBuildStage() string {
+	return b.stage
+}
+
 func (b *nonModeBuid) SetSysrq()              {}
 func (b *nonModeBuid) AppenBuildLog(s string) {}
 func (b *nonModeBuid) GetBuildLogFile() string {

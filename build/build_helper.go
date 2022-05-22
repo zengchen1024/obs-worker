@@ -5,16 +5,38 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/zengchen1024/obs-worker/sdk/config"
 	"github.com/zengchen1024/obs-worker/utils"
 )
 
 type buildHelper struct {
-	cfg  *Config
-	hc   utils.HttpClient
-	info BuildInfo
-	env  buildEnv
+	cfg     *Config
+	hc      utils.HttpClient
+	info    BuildInfo
+	env     buildEnv
+	workDir string
+
+	once   sync.Once
+	cancel chan struct{}
+}
+
+func (h *buildHelper) init() {
+	h.cancel = make(chan struct{})
+}
+
+func (h *buildHelper) isCancel() bool {
+	select {
+	case <-h.cancel:
+		return true
+	default:
+		return false
+	}
+}
+
+func (h *buildHelper) setCancel() {
+	h.once.Do(func() { close(h.cancel) })
 }
 
 func (h *buildHelper) gethc() *utils.HttpClient {
