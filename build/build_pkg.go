@@ -5,21 +5,101 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/zengchen1024/obs-worker/utils"
 )
+
+const (
+	buildActionCancel = "cancel"
+	buildActionBuild  = "build"
+)
+
+var errorCancel = fmt.Errorf("cancel")
 
 type buildPkg struct {
 	*buildHelper
 
 	needOBSPackage bool
+
+	action string
+	lock   sync.Mutex
+	wg     sync.WaitGroup
 }
 
-func (b *buildPkg) do() (int, error) {
+func (b *buildPkg) do() (code int, err error) {
+	// first check
+	b.lock.Lock()
+	if b.action == buildActionCancel {
+		code = 1
+		err = errorCancel
+
+		b.lock.Unlock()
+
+		return
+	}
+
 	v := b.genArgs()
 
-	out, err, code := utils.RunCmd(v...)
-	utils.LogInfo("build pkd, err:%v, code=%d", err, code)
+	// second check
+	b.lock.Lock()
+	if b.action == buildActionCancel {
+		code = 1
+		err = errorCancel
+
+		b.lock.Unlock()
+
+		return
+	}
+
+	b.action = buildActionBuild
+	b.wg.Add(1)
+
+	go func(args []string) {
+		defer b.wg.Done()
+
+		code, err = b.build(args)
+
+		b.lock.Lock()
+		b.action = ""
+		b.lock.Unlock()
+
+	}(v)
+
+	b.lock.Unlock()
+
+	// now, wait
+	b.wg.Wait()
+
+	return
+}
+
+func (b *buildPkg) kill() error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	if b.action == buildActionBuild {
+		args := []string{
+			filepath.Join(b.cfg.StateDir, "build", "build"),
+			"--root", b.cfg.BuildRoot,
+			"--kill",
+		}
+
+		out, err, _ := utils.RunCmd(args...)
+		if err != nil {
+			return fmt.Errorf("%s, %s", out, err.Error())
+		}
+	}
+
+	b.action = buildActionCancel
+
+	return nil
+}
+
+func (b *buildPkg) build(args []string) (int, error) {
+	out, err, code := utils.RunCmd(args...)
+
+	utils.LogInfo("build pkd, err: %s, code: %d", err.Error(), code)
 
 	if err != nil {
 		err = fmt.Errorf("%s, %v", out, err)

@@ -25,6 +25,7 @@ type nonModeBuid struct {
 	cache         cacheManager
 	oldpkg        buildOldPackages
 
+	stage          string
 	needOBSPackage bool
 }
 
@@ -35,9 +36,11 @@ func newNonModeBuild(workDir string, cfg *Config, info *buildinfo.BuildInfo) (*n
 			info:    BuildInfo{BuildInfo: *info},
 			workDir: workDir,
 		},
+		stage: BuildStagePrepare,
 	}
 
 	h := &b.buildHelper
+	h.init()
 
 	b.sources = buildSources{h}
 
@@ -88,7 +91,7 @@ func newNonModeBuild(workDir string, cfg *Config, info *buildinfo.BuildInfo) (*n
 	return &b, nil
 }
 
-func (b *nonModeBuid) DoBuild(jobId string) error {
+func (b *nonModeBuid) preBuild() error {
 	if err := b.env.init(b.cfg); err != nil {
 		return err
 	}
@@ -118,10 +121,21 @@ func (b *nonModeBuid) DoBuild(jobId string) error {
 		return err
 	}
 
-	_, err := b.build.do()
-	if err != nil {
-		return err
+	return nil
+}
+
+func (b *nonModeBuid) DoBuild(jobId string) (int, error) {
+	if err := b.preBuild(); err != nil {
+		return 0, err
 	}
+
+	b.stage = BuildStageBuilding
+
+	if c, err := b.build.do(); err != nil {
+		return c, err
+	}
+
+	b.stage = BuildStagePostBuild
 
 	dir := b.env.otherDir
 
@@ -135,7 +149,7 @@ func (b *nonModeBuid) DoBuild(jobId string) error {
 
 	b.postBuild(jobId)
 
-	return nil
+	return 0, nil
 }
 
 func (b *nonModeBuid) setBuildInfoOut() {
@@ -232,7 +246,15 @@ func (b *nonModeBuid) GetBuildInfo() *buildinfo.BuildInfo {
 	return &b.info.BuildInfo
 }
 
-func (b *nonModeBuid) Kill()                  {}
+func (b *nonModeBuid) Kill() error {
+	b.setCancel()
+	return b.build.kill()
+}
+
+func (b *nonModeBuid) GetBuildStage() string {
+	return b.stage
+}
+
 func (b *nonModeBuid) SetSysrq()              {}
 func (b *nonModeBuid) AppenBuildLog(s string) {}
 func (b *nonModeBuid) GetBuildLogFile() string {

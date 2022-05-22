@@ -25,6 +25,7 @@ type BuildManager struct {
 
 	lock  sync.RWMutex
 	state workerstate.WorkerState
+	opLog string
 
 	job       build.Build
 	nobadhost string
@@ -114,9 +115,12 @@ func (b *BuildManager) updateJob(jobid, state, log string) error {
 		return err
 	}
 
-	b.job.Kill()
+	if err := b.job.Kill(); err != nil {
+		return fmt.Errorf("could not kill job, err: %s", err.Error())
+	}
 
-	b.job.AppenBuildLog(log)
+	b.opLog = log
+	//b.job.AppenBuildLog(log)
 
 	b.state.State = state
 

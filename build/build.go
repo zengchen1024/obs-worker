@@ -7,15 +7,22 @@ import (
 	"github.com/zengchen1024/obs-worker/sdk/buildinfo"
 )
 
+const (
+	BuildStagePrepare   = "prepare"
+	BuildStageBuilding  = "building"
+	BuildStagePostBuild = "postbuild"
+)
+
 type Build interface {
-	DoBuild(string) error
+	DoBuild(string) (int, error)
 
 	GetBuildInfo() *buildinfo.BuildInfo
-	Kill()
+	Kill() error
 	SetSysrq()
 	AppenBuildLog(string)
 	GetBuildLogFile() string
 	CanDo() error
+	GetBuildStage() string
 }
 
 func NewBuild(cfg *Config, info *buildinfo.BuildInfo) (Build, error) {
