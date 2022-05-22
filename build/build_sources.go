@@ -117,12 +117,11 @@ func (b *buildSources) downloadPkgSource(project, pkg, srcmd5, endpoint, saveTo 
 		return name, filepath.Join(saveTo, name), true, nil
 	}
 
-	return source.List(b.gethc(), endpoint, &opts, check)
+	return source.List(endpoint, &opts, check)
 }
 
 func (b *buildSources) downloadSSLCert() error {
 	v, err := sslcert.List(
-		b.gethc(),
 		b.getSrcServer(), b.getBuildInfo().Project, true,
 	)
 	if err != nil || len(v) == 0 {

@@ -44,7 +44,7 @@ func (o *QueryOpts) toQuery() (string, error) {
 	return q.Encode(), nil
 }
 
-func Create(hc *utils.HttpClient, endpoint string, opts *QueryOpts, w *Worker) (err error) {
+func Create(endpoint string, opts *QueryOpts, w *Worker) (err error) {
 	q, err := opts.toQuery()
 	if err != nil {
 		return
@@ -67,10 +67,10 @@ func Create(hc *utils.HttpClient, endpoint string, opts *QueryOpts, w *Worker) (
 
 	req.Header.Set("Content-Length", strconv.Itoa(len(data)))
 
-	return hc.ForwardTo(req, nil)
+	return utils.ForwardTo(req, nil)
 }
 
-func Get(hc *utils.HttpClient, endpoint string, opts *QueryOpts) (err error) {
+func Get(endpoint string, opts *QueryOpts) (err error) {
 	q, err := opts.toQuery()
 	if err != nil {
 		return
@@ -86,5 +86,5 @@ func Get(hc *utils.HttpClient, endpoint string, opts *QueryOpts) (err error) {
 		return
 	}
 
-	return hc.ForwardTo(req, nil)
+	return utils.ForwardTo(req, nil)
 }

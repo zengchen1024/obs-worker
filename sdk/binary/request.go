@@ -69,7 +69,7 @@ func (o *ListOpts) toQuery() (string, error) {
 	return q.Encode(), nil
 }
 
-func List(hc *utils.HttpClient, endpoint string, opts *ListOpts) (binaries BinaryVersionList, err error) {
+func List(endpoint string, opts *ListOpts) (binaries BinaryVersionList, err error) {
 	q, err := opts.toQuery()
 	if err != nil {
 		return
@@ -99,7 +99,7 @@ func List(hc *utils.HttpClient, endpoint string, opts *ListOpts) (binaries Binar
 		return binaries.extract(b)
 	}
 
-	err = hc.ForwardTo(req, handle)
+	err = utils.ForwardTo(req, handle)
 
 	return
 }
@@ -123,7 +123,7 @@ func (o *DownloadOpts) toQuery() (string, error) {
 	return q.Encode(), nil
 }
 
-func Download(hc *utils.HttpClient, endpoint string, opts *DownloadOpts, saveToDir string) (meta []filereceiver.CPIOFileMeta, err error) {
+func Download(endpoint string, opts *DownloadOpts, saveToDir string) (meta []filereceiver.CPIOFileMeta, err error) {
 	q, err := opts.toQuery()
 	if err != nil {
 		return
@@ -152,7 +152,7 @@ func Download(hc *utils.HttpClient, endpoint string, opts *DownloadOpts, saveToD
 		return err
 	}
 
-	err = hc.ForwardTo(req, handle)
+	err = utils.ForwardTo(req, handle)
 
 	return
 }

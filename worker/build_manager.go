@@ -8,7 +8,6 @@ import (
 	"github.com/zengchen1024/obs-worker/sdk/buildinfo"
 	"github.com/zengchen1024/obs-worker/sdk/worker"
 	"github.com/zengchen1024/obs-worker/sdk/workerstate"
-	"github.com/zengchen1024/obs-worker/utils"
 )
 
 var instance *BuildManager
@@ -19,7 +18,6 @@ func GetBuildManager() *BuildManager {
 
 type BuildManager struct {
 	cfg  *build.Config
-	hc   utils.HttpClient
 	w    worker.Worker
 	port int
 

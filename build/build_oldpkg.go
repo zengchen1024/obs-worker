@@ -36,7 +36,7 @@ func (b *buildOldPackages) download() error {
 		return name, filepath.Join(dir, name), false, nil
 	}
 
-	r, err := oldpkg.List(b.gethc(), info.RepoServer, &opts, check)
+	r, err := oldpkg.List(info.RepoServer, &opts, check)
 	if err != nil {
 		return err
 	}

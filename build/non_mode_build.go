@@ -288,7 +288,7 @@ func (b *nonModeBuid) postBuild(jobId string) {
 		},
 	)
 
-	err := job.Put(b.gethc(), info.RepoServer, opt, files)
+	err := job.Put(info.RepoServer, opt, files)
 	if err != nil {
 		utils.LogErr("upload build files, err:%s", err.Error())
 	}

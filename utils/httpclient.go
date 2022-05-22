@@ -13,13 +13,8 @@ import (
 	"time"
 )
 
-type HttpClient struct {
-	cli        http.Client
-	MaxRetries int
-}
-
-func (hc *HttpClient) ForwardTo(req *http.Request, handle func(http.Header, io.Reader) error) error {
-	resp, err := hc.do(req)
+func ForwardTo(req *http.Request, handle func(http.Header, io.Reader) error) error {
+	resp, err := sendReq(req)
 	if err != nil || resp == nil {
 		return err
 	}
@@ -41,19 +36,19 @@ func (hc *HttpClient) ForwardTo(req *http.Request, handle func(http.Header, io.R
 	return nil
 }
 
-func (hc *HttpClient) do(req *http.Request) (resp *http.Response, err error) {
-	if resp, err = hc.cli.Do(req); err == nil {
+func sendReq(req *http.Request) (resp *http.Response, err error) {
+	if resp, err = http.DefaultClient.Do(req); err == nil {
 		return
 	}
 
-	maxRetries := hc.MaxRetries
+	maxRetries := 3
 	backoff := 10 * time.Millisecond
 
 	for retries := 1; retries < maxRetries; retries++ {
 		time.Sleep(backoff)
 		backoff *= 2
 
-		if resp, err = hc.cli.Do(req); err == nil {
+		if resp, err = http.DefaultClient.Do(req); err == nil {
 			break
 		}
 	}

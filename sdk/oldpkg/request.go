@@ -17,7 +17,6 @@ type ListOpts struct {
 }
 
 func List(
-	hc *utils.HttpClient,
 	endpoint string, opts *ListOpts,
 	check filereceiver.CPIOPreCheck,
 ) (meta []filereceiver.CPIOFileMeta, err error) {
@@ -51,7 +50,7 @@ func List(
 		return err
 	}
 
-	err = hc.ForwardTo(req, handle)
+	err = utils.ForwardTo(req, handle)
 
 	return
 }
