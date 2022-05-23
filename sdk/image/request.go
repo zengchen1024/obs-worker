@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 
 	"github.com/zengchen1024/obs-worker/sdk/filereceiver"
 	"github.com/zengchen1024/obs-worker/utils"
@@ -54,8 +53,7 @@ func Post(endpoint string, opts *QueryOpts, data []byte, workDir string) (images
 			return err
 		}
 
-		p := filepath.Join(workDir, f.Name())
-		defer os.Remove(p)
+		defer os.Remove(f.Name())
 
 		_, err = io.Copy(f, r)
 		f.Close()
@@ -63,7 +61,7 @@ func Post(endpoint string, opts *QueryOpts, data []byte, workDir string) (images
 			return err
 		}
 
-		images, err = extract(p, workDir)
+		images, err = extract(f.Name(), workDir)
 
 		return err
 	}

@@ -19,8 +19,6 @@ type Image struct {
 	HdrMD5s []string `json:"hdrmd5s"`
 }
 
-var Extract = extract
-
 func extract(input string, workDir string) ([]Image, error) {
 	var images struct {
 		Images []Image `json:"images"`

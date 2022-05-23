@@ -19,7 +19,11 @@ sub store {
   }
 
   eval {
-    Storable::nstore($r, "$cachedir/content.new111");
+    my $dst = "$cachedir/content";
+    my $tmp = "$cachedir/content.new";
+
+    Storable::nstore($r, $tmp);
+    rename($tmp, $dst) || die("500 rename $tmp -> $dst: $!\n");
   };
   if ($@) {
     return 1;
