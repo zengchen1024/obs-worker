@@ -38,6 +38,7 @@ func (b *buildPkg) do() (code int, err error) {
 
 		return
 	}
+	b.lock.Unlock()
 
 	v := b.genArgs()
 
@@ -97,11 +98,13 @@ func (b *buildPkg) kill() error {
 }
 
 func (b *buildPkg) build(args []string) (int, error) {
+	utils.LogInfo("start obs-build")
+
 	out, err, code := utils.RunCmd(args...)
 
-	utils.LogInfo("build pkd, err: %s, code: %d", err.Error(), code)
-
 	if err != nil {
+		utils.LogInfo("build pkd, err: %s, code: %d", err.Error(), code)
+
 		err = fmt.Errorf("%s, %v", out, err)
 
 		switch code {

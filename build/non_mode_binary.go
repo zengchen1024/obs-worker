@@ -37,6 +37,8 @@ func (b *nonModeBinary) getBinaries(considerPreInstallImg bool) ([]string, error
 	var imageBins map[string]string
 
 	if considerPreInstallImg {
+		utils.LogInfo("start getting preinstall image")
+
 		imageBins, imagesWithMeta = b.getPreInstallImage(todo)
 
 		for k := range imageBins {
@@ -45,6 +47,8 @@ func (b *nonModeBinary) getBinaries(considerPreInstallImg bool) ([]string, error
 			}
 		}
 	}
+
+	utils.LogInfo("start getting binary cache")
 
 	done, metas := b.getBinaryCache(todo)
 
@@ -56,6 +60,8 @@ func (b *nonModeBinary) getBinaries(considerPreInstallImg bool) ([]string, error
 	}
 
 	imagesWithMeta = imagesWithMeta.Union(metas)
+
+	utils.LogInfo("start generating meta data")
 
 	return b.genMetaData(done, imageBins, imagesWithMeta)
 }

@@ -42,50 +42,35 @@ func newNonModeBuild(workDir string, cfg *Config, info *buildinfo.BuildInfo) (*n
 	h := &b.buildHelper
 	h.init()
 
-	b.sources = buildSources{h}
-
-	b.rpmlist = buildRpmlist{
-		buildHelper: h,
-	}
-
-	b.build = buildPkg{
-		buildHelper: h,
-	}
-
-	b.cache = cacheManager{}
+	b.sources.buildHelper = h
+	b.rpmlist.buildHelper = h
+	b.build.buildHelper = h
 	b.cache.init(h)
 
-	b.oldpkg = buildOldPackages{
-		buildHelper:           h,
-		handleDownloadDetails: b.stats.setBinaryDownloadDetail,
-	}
+	b.oldpkg.buildHelper = h
+	b.oldpkg.handleDownloadDetails = b.stats.setBinaryDownloadDetail
 
-	b.binaryManager = binaryManager{
-		buildHelper:           h,
-		cache:                 &b.cache,
-		handleCacheHits:       b.stats.setCacheHit,
-		handleDownloadDetails: b.stats.setBinaryDownloadDetail,
-	}
-	b.binaryManager.init()
+	bm := &b.binaryManager
+	bm.buildHelper = h
+	bm.cache = &b.cache
+	bm.handleCacheHits = b.stats.setCacheHit
+	bm.handleDownloadDetails = b.stats.setBinaryDownloadDetail
+	bm.init()
 
-	b.imageManager = preInstallImageManager{
-		buildHelper:    h,
-		cache:          &b.cache,
-		handleRepoBins: b.binaryManager.setKnownBins,
-	}
+	im := &b.imageManager
+	im.buildHelper = h
+	im.cache = &b.cache
+	im.handleRepoBins = b.binaryManager.setKnownBins
 
-	b.binaryLoader = nonModeBinary{
-		buildHelper:   h,
-		imageManager:  &b.imageManager,
-		binaryManager: &b.binaryManager,
-
-		handleOutBDep:    b.out.setBdep,
-		handleKiwiOrigin: b.report.setKiwiOrigin,
-
-		handleImage: func(img *preInstallImage) {
-			b.rpmlist.setPreInstallImage(img)
-			b.stats.setPreInstallImage(img)
-		},
+	bl := &b.binaryLoader
+	bl.buildHelper = h
+	bl.imageManager = &b.imageManager
+	bl.handleOutBDep = b.out.setBdep
+	bl.binaryManager = &b.binaryManager
+	bl.handleKiwiOrigin = b.report.setKiwiOrigin
+	bl.handleImage = func(img *preInstallImage) {
+		b.rpmlist.setPreInstallImage(img)
+		b.stats.setPreInstallImage(img)
 	}
 
 	return &b, nil
@@ -113,9 +98,13 @@ func (b *nonModeBuid) preBuild() error {
 
 	b.stats.recordDownloadTime()
 
+	utils.LogInfo("start downloading project config")
+
 	if err := b.downloadProjectConfig(); err != nil {
 		return err
 	}
+
+	utils.LogInfo("start generating rpmlist")
 
 	if err := b.rpmlist.generate(); err != nil {
 		return err
@@ -129,11 +118,15 @@ func (b *nonModeBuid) DoBuild(jobId string) (int, error) {
 		return 0, err
 	}
 
+	utils.LogInfo("start building")
+
 	b.stage = BuildStageBuilding
 
 	if c, err := b.build.do(); err != nil {
 		return c, err
 	}
+
+	utils.LogInfo("start post build")
 
 	b.stage = BuildStagePostBuild
 

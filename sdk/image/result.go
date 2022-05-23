@@ -19,7 +19,9 @@ type Image struct {
 	HdrMD5s []string `json:"hdrmd5s"`
 }
 
-func extract(input []byte, workDir string) ([]Image, error) {
+var Extract = extract
+
+func extract(input string, workDir string) ([]Image, error) {
 	var images struct {
 		Images []Image `json:"images"`
 	}
@@ -27,7 +29,7 @@ func extract(input []byte, workDir string) ([]Image, error) {
 	v, err, _ := utils.RunCmd(
 		"perl", "-I", filepath.Join(workDir, "perl"),
 		filepath.Join(workDir, "perl", "parse_image_info.pm"),
-		string(input),
+		input,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("%s, %v", v, err)

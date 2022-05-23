@@ -120,6 +120,8 @@ func (b *BuildManager) runJob(jobId string, job build.Build) {
 		}
 	}
 
+	utils.LogInfo("I am idle again")
+
 	b.lock.Lock()
 	defer b.lock.Unlock()
 

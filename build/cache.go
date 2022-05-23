@@ -72,7 +72,7 @@ func (c *cacheManager) init(h *buildHelper) {
 	c.setCacheScript = filepath.Join(dir, "store_cache_content.pm")
 }
 
-func (c *cacheManager) getCurrentCacheInfo(cf utils.FileOp) ([]cacheBinInfo, error) {
+func (c *cacheManager) getCurrentCacheInfo() ([]cacheBinInfo, error) {
 	cache := struct {
 		Content []cacheBinInfo `json:"content"`
 	}{}
@@ -179,7 +179,7 @@ func (c *cacheManager) pruneCache(pruneSize int, oldCache []cacheBinInfo, news [
 		return err
 	}
 
-	v, err := c.getCurrentCacheInfo(cf)
+	v, err := c.getCurrentCacheInfo()
 	if err != nil {
 		return err
 	}
