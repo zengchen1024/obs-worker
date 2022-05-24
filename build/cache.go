@@ -72,7 +72,7 @@ func (c *cacheManager) init(h *buildHelper) {
 	c.setCacheScript = filepath.Join(dir, "store_cache_content.pm")
 }
 
-func (c *cacheManager) getCurrentCacheInfo(cf utils.FileOp) ([]cacheBinInfo, error) {
+func (c *cacheManager) getCurrentCacheInfo() ([]cacheBinInfo, error) {
 	cache := struct {
 		Content []cacheBinInfo `json:"content"`
 	}{}
@@ -164,8 +164,11 @@ func (c *cacheManager) addNewCache(caches []cacheBin) ([]cacheBinInfo, error) {
 }
 
 func (c *cacheManager) pruneCache(pruneSize int, oldCache []cacheBinInfo, news []cacheBin) error {
+	// if using content file itself as the lock file,
+	// the later actions will unlock it such as renaming which
+	// should be done in the context of locking.
 	cf, err := utils.LockOpen(
-		filepath.Join(c.getCacheDir(), "content"),
+		filepath.Join(c.getCacheDir(), "lock"),
 		os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644,
 	)
 	if err != nil {
@@ -179,7 +182,7 @@ func (c *cacheManager) pruneCache(pruneSize int, oldCache []cacheBinInfo, news [
 		return err
 	}
 
-	v, err := c.getCurrentCacheInfo(cf)
+	v, err := c.getCurrentCacheInfo()
 	if err != nil {
 		return err
 	}

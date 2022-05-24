@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strconv"
+	"os"
 
 	"github.com/zengchen1024/obs-worker/sdk/filereceiver"
 	"github.com/zengchen1024/obs-worker/utils"
@@ -47,17 +48,20 @@ func Post(endpoint string, opts *QueryOpts, data []byte, workDir string) (images
 	req.Header.Set("Content-Type", "application/octet-stream")
 
 	handle := func(h http.Header, r io.Reader) error {
-		n, err := strconv.Atoi(h.Get("content-length"))
+		f, err := ioutil.TempFile(workDir, "getpreinstallimageinfos")
 		if err != nil {
 			return err
 		}
 
-		b, err := utils.ReadData(r, "", int64(n))
+		defer os.Remove(f.Name())
+
+		_, err = io.Copy(f, r)
+		f.Close()
 		if err != nil {
 			return err
 		}
 
-		images, err = extract(b, workDir)
+		images, err = extract(f.Name(), workDir)
 
 		return err
 	}
