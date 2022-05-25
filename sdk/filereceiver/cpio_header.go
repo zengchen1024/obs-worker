@@ -11,10 +11,7 @@ type CPIOFileHeader struct {
 	Mtime    int64
 	Mode     int64
 	Size     int64
-	Type     int
 	Namesize int
-	Namepad  int
-	Pad      int
 }
 
 func (h *CPIOFileHeader) GetPad() int {

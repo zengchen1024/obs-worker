@@ -56,23 +56,15 @@ func sendReq(req *http.Request) (resp *http.Response, err error) {
 }
 
 func ReadData(r io.Reader, total int64) ([]byte, error) {
-	last := total
-	buf := make([]byte, last)
+	buf := make([]byte, total)
 
-	for start, pn := int64(0), int64(0); last > 0; {
-		pn = 8192
-		if last < pn {
-			pn = last
-		}
+	n, err := ReadTo(nil, r, buf)
+	if err != nil {
+		return nil, err
+	}
 
-		n, err := r.Read(buf[start : start+pn])
-		if err != nil && n == 0 {
-			return nil, err
-		}
-
-		pn = int64(n)
-		start += pn
-		last -= pn
+	if int64(n) != total {
+		return buf[:n], io.EOF
 	}
 
 	return buf, nil

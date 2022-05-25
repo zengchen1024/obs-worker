@@ -3,7 +3,6 @@ package filereceiver
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/zengchen1024/obs-worker/utils"
@@ -36,8 +35,7 @@ func (r *cpioReceiver) do() ([]CPIOFileMeta, error) {
 
 	for {
 		// read header
-		buf := make([]byte, 110)
-		_, err := utils.ReadTo(nil, r.reader, buf)
+		buf, err := utils.ReadData(r.reader, 110)
 		if err != nil {
 			return nil, err
 		}
@@ -47,9 +45,10 @@ func (r *cpioReceiver) do() ([]CPIOFileMeta, error) {
 			return nil, err
 		}
 
-		// reand file name
-		buf = make([]byte, header.Namesize+header.Namepad)
-		_, err = utils.ReadTo(nil, r.reader, buf)
+		// read file name
+		buf, err = utils.ReadData(
+			r.reader, int64(header.Namesize+header.getNamePad()),
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -77,34 +76,20 @@ func (r *cpioReceiver) do() ([]CPIOFileMeta, error) {
 		}
 
 		if name == "" {
-			_, err := utils.ReadData(r.reader, header.Size+int64(header.Pad))
+			err := utils.EmptyRead(r.reader, int(header.Size)+header.GetPad())
 			if err != nil {
 				return nil, err
 			}
 
 			continue
 		}
-
 		meta.Name = name
 
-		// read file
-		tmp := saveTo
-		if saveTo == "" {
-			// TODO gen tmp
-			defer os.Remove(tmp)
-		}
-
-		if err := r.saveCPIOFile(header, tmp); err != nil {
+		v, err := r.handleCPIOFile(header, saveTo, calcMD5)
+		if err != nil {
 			return nil, err
 		}
-
-		if calcMD5 {
-			if v, err := utils.GenMd5OfFile(tmp); err == nil {
-				meta.MD5 = v
-			} else {
-				return nil, err
-			}
-		}
+		meta.MD5 = v
 
 		metas = append(metas, meta)
 	}
@@ -112,18 +97,42 @@ func (r *cpioReceiver) do() ([]CPIOFileMeta, error) {
 	return metas, nil
 }
 
-func (r *cpioReceiver) saveCPIOFile(header *CPIOFileHeader, file string) error {
-	lr := &limitedRead{
-		max: int(header.Size),
-		r:   r.reader,
+func (r *cpioReceiver) handleCPIOFile(header *CPIOFileHeader, saveTo string, calcMD5 bool) (string, error) {
+	if saveTo != "" {
+		if err := r.saveCPIOFile(header, saveTo); err != nil {
+			return "", err
+		}
+
+		if calcMD5 {
+			return utils.GenMd5OfFile(saveTo)
+		}
+
+		return "", nil
 	}
 
-	if err := Save(lr, file); err != nil {
+	v, err := utils.GenMd5OfByteStream(r.reader, int(header.Size))
+	if err != nil {
+		return v, err
+	}
+
+	n := header.GetPad()
+	if n == 0 {
+		return v, nil
+	}
+
+	_, err = utils.ReadData(r.reader, int64(n))
+	return v, err
+}
+
+func (r *cpioReceiver) saveCPIOFile(header *CPIOFileHeader, file string) error {
+	err := utils.DownloadFileWithSize(r.reader, int(header.Size), file)
+	if err != nil {
 		return err
 	}
 
-	if header.Pad > 0 {
-		_, err := utils.ReadData(r.reader, int64(header.Pad))
+	if n := header.GetPad(); n > 0 {
+		_, err := utils.ReadData(r.reader, int64(n))
+
 		return err
 	}
 

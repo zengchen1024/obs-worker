@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/md5"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/sirupsen/logrus"
@@ -14,12 +15,31 @@ func GenMD5(b []byte) string {
 }
 
 func GenMd5OfFile(f string) (string, error) {
-	v, err := os.ReadFile(f)
+	fi, err := os.Open(f)
 	if err != nil {
 		return "", err
 	}
 
-	return GenMD5(v), nil
+	defer fi.Close()
+
+	h := md5.New()
+
+	if err := transfer(fi, h); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+func GenMd5OfByteStream(r io.Reader, size int) (string, error) {
+	h := md5.New()
+	lr := &limitedRead{size, r}
+
+	if err := transfer(lr, h); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
 func LogInfo(f string, v ...interface{}) {

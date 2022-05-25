@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -125,21 +126,36 @@ func (b BuildController) uploadLog(file string, start int64, end *int64, w http.
 		total = v
 	}
 
-	for n := int64(0); total > 0; total -= n {
-		n = 4096
-		if total < n {
-			n = total
+	upload(f, int(total), w)
+
+	return nil
+}
+
+func upload(r io.Reader, total int, w io.Writer) {
+	lr := utils.NewLimitedReader(total, r)
+
+	read := func() ([]byte, error) {
+		n := 4096
+		buf := make([]byte, n+8)
+
+		n, err := utils.ReadTo(nil, lr, buf[6:n+6])
+		if err != nil || n == 0 {
+			return nil, err
 		}
 
-		chunk, err := utils.ReadData(f, n)
-		if err != nil {
-			break
-		}
+		copy(buf, fmt.Sprintf("%04X\r\n", n))
+		copy(buf[n+6:], []byte("\r\n"))
 
-		fmt.Fprint(w, fmt.Sprintf("%X\r\n", n), chunk, "\r\n")
+		return buf[:n+8], nil
+	}
+
+	write := func(data []byte) error {
+		return utils.Write(nil, w, data)
+	}
+
+	if err := utils.TransferData(read, write); err != nil {
+		return
 	}
 
 	fmt.Fprint(w, "0\r\n\r\n")
-
-	return nil
 }
