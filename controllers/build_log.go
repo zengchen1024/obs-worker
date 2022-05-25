@@ -126,12 +126,12 @@ func (b BuildController) uploadLog(file string, start int64, end *int64, w http.
 		total = v
 	}
 
-	upload(f, int(total), w)
+	upload(f, total, w)
 
 	return nil
 }
 
-func upload(r io.Reader, total int, w io.Writer) {
+func upload(r io.Reader, total int64, w io.Writer) {
 	lr := utils.NewLimitedReader(total, r)
 
 	read := func() ([]byte, error) {

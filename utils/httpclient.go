@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -53,66 +52,6 @@ func sendReq(req *http.Request) (resp *http.Response, err error) {
 		}
 	}
 	return
-}
-
-func ReadData(r io.Reader, total int64) ([]byte, error) {
-	buf := make([]byte, total)
-
-	n, err := ReadTo(nil, r, buf)
-	if err != nil {
-		return nil, err
-	}
-
-	if int64(n) != total {
-		return buf[:n], io.EOF
-	}
-
-	return buf, nil
-}
-
-func ReadTo(ctx context.Context, r io.Reader, buf []byte) (int, error) {
-	last := len(buf)
-
-	for start, n := 0, 0; last > 0; {
-		if ctx != nil && IsCtxDone(ctx) {
-			return 0, fmt.Errorf("canceled")
-		}
-
-		if n = 8192; last < n {
-			n = last
-		}
-
-		n, err := r.Read(buf[start : start+n])
-		if err != nil && n == 0 {
-			if errors.Is(err, io.EOF) {
-				return start, nil
-			}
-
-			return start, err
-		}
-
-		start += n
-		last -= n
-	}
-
-	return len(buf), nil
-}
-
-func Write(ctx context.Context, w io.Writer, data []byte) error {
-	for offset, total := 0, len(data); offset < total; {
-		if ctx != nil && IsCtxDone(ctx) {
-			return fmt.Errorf("canceled")
-		}
-
-		n, err := w.Write(data[offset:])
-		if err != nil {
-			return err
-		}
-
-		offset += n
-	}
-
-	return nil
 }
 
 func JsonMarshal(t interface{}) ([]byte, error) {

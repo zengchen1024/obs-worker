@@ -16,7 +16,7 @@ func DownloadFile(r io.Reader, file string) error {
 	return transfer(r, fo)
 }
 
-func DownloadFileWithSize(r io.Reader, size int, file string) error {
+func DownloadFileWithSize(r io.Reader, size int64, file string) error {
 	fo, err := os.Create(file)
 	if err != nil {
 		return err
@@ -28,7 +28,7 @@ func DownloadFileWithSize(r io.Reader, size int, file string) error {
 	return transfer(lr, fo)
 }
 
-func EmptyRead(r io.Reader, size int) error {
+func EmptyRead(r io.Reader, size int64) error {
 	return DownloadFileWithSize(r, size, os.DevNull)
 }
 
@@ -52,7 +52,7 @@ func transfer(r io.Reader, w io.Writer) error {
 }
 
 type limitedRead struct {
-	max int
+	max int64
 	r   io.Reader
 }
 
@@ -63,11 +63,11 @@ func (l *limitedRead) Read(buf []byte) (int, error) {
 
 	n, err := l.r.Read(buf)
 
-	l.max -= n
+	l.max -= int64(n)
 
 	return n, err
 }
 
-func NewLimitedReader(max int, r io.Reader) io.Reader {
+func NewLimitedReader(max int64, r io.Reader) io.Reader {
 	return &limitedRead{max, r}
 }

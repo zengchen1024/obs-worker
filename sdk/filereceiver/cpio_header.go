@@ -14,6 +14,14 @@ type CPIOFileHeader struct {
 	Namesize int
 }
 
+func (h *CPIOFileHeader) GetFileStreamSize() int64 {
+	return h.Size + int64(h.GetPad())
+}
+
+func (h *CPIOFileHeader) GetNameStreamSize() int {
+	return h.Namesize + h.getNamePad()
+}
+
 func (h *CPIOFileHeader) GetPad() int {
 	return int(4-(h.Size&3)) & 3
 }

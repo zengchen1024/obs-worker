@@ -10,9 +10,8 @@ import (
 
 type CPIOFileMeta struct {
 	Name         string
+	MD5          string
 	OriginalName string
-
-	MD5 string
 
 	CPIOFileHeader
 }
@@ -46,9 +45,7 @@ func (r *cpioReceiver) do() ([]CPIOFileMeta, error) {
 		}
 
 		// read file name
-		buf, err = utils.ReadData(
-			r.reader, int64(header.Namesize+header.getNamePad()),
-		)
+		buf, err = utils.ReadData(r.reader, header.GetNameStreamSize())
 		if err != nil {
 			return nil, err
 		}
@@ -76,7 +73,7 @@ func (r *cpioReceiver) do() ([]CPIOFileMeta, error) {
 		}
 
 		if name == "" {
-			err := utils.EmptyRead(r.reader, int(header.Size)+header.GetPad())
+			err := utils.EmptyRead(r.reader, header.GetFileStreamSize())
 			if err != nil {
 				return nil, err
 			}
@@ -110,7 +107,7 @@ func (r *cpioReceiver) handleCPIOFile(header *CPIOFileHeader, saveTo string, cal
 		return "", nil
 	}
 
-	v, err := utils.GenMd5OfByteStream(r.reader, int(header.Size))
+	v, err := utils.GenMd5OfByteStream(r.reader, header.Size)
 	if err != nil {
 		return v, err
 	}
@@ -120,18 +117,18 @@ func (r *cpioReceiver) handleCPIOFile(header *CPIOFileHeader, saveTo string, cal
 		return v, nil
 	}
 
-	_, err = utils.ReadData(r.reader, int64(n))
+	_, err = utils.ReadData(r.reader, n)
 	return v, err
 }
 
 func (r *cpioReceiver) saveCPIOFile(header *CPIOFileHeader, file string) error {
-	err := utils.DownloadFileWithSize(r.reader, int(header.Size), file)
+	err := utils.DownloadFileWithSize(r.reader, header.Size, file)
 	if err != nil {
 		return err
 	}
 
 	if n := header.GetPad(); n > 0 {
-		_, err := utils.ReadData(r.reader, int64(n))
+		_, err := utils.ReadData(r.reader, n)
 
 		return err
 	}
