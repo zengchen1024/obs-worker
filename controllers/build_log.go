@@ -131,7 +131,7 @@ func (b BuildController) uploadLog(file string, start int64, end *int64, w http.
 			n = total
 		}
 
-		chunk, err := utils.ReadData(f, "", n)
+		chunk, err := utils.ReadData(f, n)
 		if err != nil {
 			break
 		}

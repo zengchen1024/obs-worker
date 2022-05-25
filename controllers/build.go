@@ -141,7 +141,7 @@ func (b BuildController) extract(
 		return "", err
 	}
 
-	data, err := utils.ReadData(r.Body, "job", int64(n))
+	data, err := utils.ReadData(r.Body, int64(n))
 	if err != nil {
 		return "", err
 	}

@@ -55,23 +55,7 @@ func sendReq(req *http.Request) (resp *http.Response, err error) {
 	return
 }
 
-func ReadOnce(r io.Reader, part string, buf []byte, checkLen bool) (int, error) {
-	n, err := r.Read(buf)
-	if err != nil && n == 0 {
-		return n, fmt.Errorf("read %s, err: %v", part, err)
-	}
-
-	if checkLen && n != len(buf) {
-		return n, fmt.Errorf(
-			"encounter unexpect EOF for %s, expect to read %d bytes, but got %d",
-			part, len(buf), n,
-		)
-	}
-
-	return n, nil
-}
-
-func ReadData(r io.Reader, name string, total int64) ([]byte, error) {
+func ReadData(r io.Reader, total int64) ([]byte, error) {
 	last := total
 	buf := make([]byte, last)
 
@@ -81,8 +65,8 @@ func ReadData(r io.Reader, name string, total int64) ([]byte, error) {
 			pn = last
 		}
 
-		n, err := ReadOnce(r, name, buf[start:start+pn], false)
-		if err != nil {
+		n, err := r.Read(buf[start : start+pn])
+		if err != nil && n == 0 {
 			return nil, err
 		}
 
@@ -98,7 +82,7 @@ func ReadTo(ctx context.Context, r io.Reader, buf []byte) (int, error) {
 	last := len(buf)
 
 	for start, n := 0, 0; last > 0; {
-		if IsCtxDone(ctx) {
+		if ctx != nil && IsCtxDone(ctx) {
 			return 0, fmt.Errorf("canceled")
 		}
 
@@ -124,7 +108,7 @@ func ReadTo(ctx context.Context, r io.Reader, buf []byte) (int, error) {
 
 func Write(ctx context.Context, w io.Writer, data []byte) error {
 	for offset, total := 0, len(data); offset < total; {
-		if IsCtxDone(ctx) {
+		if ctx != nil && IsCtxDone(ctx) {
 			return fmt.Errorf("canceled")
 		}
 
