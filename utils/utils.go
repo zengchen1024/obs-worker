@@ -12,6 +12,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var ErrCancel = fmt.Errorf("canceled")
+
 func GenMD5(b []byte) string {
 	return fmt.Sprintf("%x", md5.Sum(b))
 }
@@ -94,7 +96,7 @@ func ReadTo(ctx context.Context, r io.Reader, buf []byte) (int, error) {
 
 	for start, n := 0, 0; last > 0; {
 		if ctx != nil && IsCtxDone(ctx) {
-			return 0, fmt.Errorf("canceled")
+			return 0, ErrCancel
 		}
 
 		if n = 8192; last < n {
@@ -120,7 +122,7 @@ func ReadTo(ctx context.Context, r io.Reader, buf []byte) (int, error) {
 func Write(ctx context.Context, w io.Writer, data []byte) error {
 	for offset, total := 0, len(data); offset < total; {
 		if ctx != nil && IsCtxDone(ctx) {
-			return fmt.Errorf("canceled")
+			return ErrCancel
 		}
 
 		n, err := w.Write(data[offset:])
