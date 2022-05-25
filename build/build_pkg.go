@@ -15,8 +15,6 @@ const (
 	buildActionBuild  = "build"
 )
 
-var errorCancel = fmt.Errorf("cancel")
-
 type buildPkg struct {
 	*buildHelper
 
@@ -32,7 +30,7 @@ func (b *buildPkg) do() (code int, err error) {
 	b.lock.Lock()
 	if b.action == buildActionCancel {
 		code = 1
-		err = errorCancel
+		err = utils.ErrCancel
 
 		b.lock.Unlock()
 
@@ -46,7 +44,7 @@ func (b *buildPkg) do() (code int, err error) {
 	b.lock.Lock()
 	if b.action == buildActionCancel {
 		code = 1
-		err = errorCancel
+		err = utils.ErrCancel
 
 		b.lock.Unlock()
 

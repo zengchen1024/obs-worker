@@ -3,7 +3,6 @@ package filereceiver
 import (
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 
 	"github.com/zengchen1024/obs-worker/utils"
@@ -11,10 +10,8 @@ import (
 
 type CPIOFileMeta struct {
 	Name         string
+	MD5          string
 	OriginalName string
-
-	MD5  string
-	Data string
 
 	CPIOFileHeader
 }
@@ -37,20 +34,18 @@ func (r *cpioReceiver) do() ([]CPIOFileMeta, error) {
 
 	for {
 		// read header
-		buf := make([]byte, 110)
-		_, err := r.read("header", buf, true)
+		buf, err := utils.ReadData(r.reader, 110)
 		if err != nil {
 			return nil, err
 		}
 
-		header, err := r.parseHeader(buf)
-		if err != nil {
+		header := &CPIOFileHeader{}
+		if err := header.extract(buf); err != nil {
 			return nil, err
 		}
 
-		// reand file name
-		buf = make([]byte, header.Namesize+header.Namepad)
-		_, err = r.read("name", buf, true)
+		// read file name
+		buf, err = utils.ReadData(r.reader, header.GetNameStreamSize())
 		if err != nil {
 			return nil, err
 		}
@@ -68,41 +63,30 @@ func (r *cpioReceiver) do() ([]CPIOFileMeta, error) {
 
 		meta := CPIOFileMeta{
 			OriginalName:   name,
-			CPIOFileHeader: header,
+			CPIOFileHeader: *header,
 		}
 
 		// pre check
-		name, saveTo, calcMD5, err := r.precheck(name, &header)
+		name, saveTo, calcMD5, err := r.precheck(name, header)
 		if err != nil {
 			return nil, err
 		}
 
 		if name == "" {
-			if _, err := r.readFile("", &header); err != nil {
+			err := utils.EmptyRead(r.reader, header.GetFileStreamSize())
+			if err != nil {
 				return nil, err
 			}
+
 			continue
 		}
 		meta.Name = name
 
-		// read file
-		file, err := r.readFile(name, &header)
+		v, err := r.handleCPIOFile(header, saveTo, calcMD5)
 		if err != nil {
 			return nil, err
 		}
-
-		if saveTo != "" {
-			err = utils.WriteFile(saveTo, file)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			meta.Data = string(file)
-		}
-
-		if calcMD5 {
-			meta.MD5 = utils.GenMD5(file)
-		}
+		meta.MD5 = v
 
 		metas = append(metas, meta)
 	}
@@ -110,90 +94,44 @@ func (r *cpioReceiver) do() ([]CPIOFileMeta, error) {
 	return metas, nil
 }
 
-func (r *cpioReceiver) read(part string, buf []byte, checkLen bool) (int, error) {
-	n, err := r.reader.Read(buf)
-	if err != nil && n == 0 {
-		return n, fmt.Errorf("read %s, err: %v", part, err)
+func (r *cpioReceiver) handleCPIOFile(header *CPIOFileHeader, saveTo string, calcMD5 bool) (string, error) {
+	if saveTo != "" {
+		if err := r.saveCPIOFile(header, saveTo); err != nil {
+			return "", err
+		}
+
+		if calcMD5 {
+			return utils.GenMd5OfFile(saveTo)
+		}
+
+		return "", nil
 	}
 
-	if checkLen && n != len(buf) {
-		return n, fmt.Errorf(
-			"encounter unexpect EOF for %s, expect to read %d bytes, but got %d",
-			part, len(buf), n,
-		)
+	v, err := utils.GenMd5OfByteStream(r.reader, header.Size)
+	if err != nil {
+		return v, err
 	}
 
-	return n, nil
+	n := header.GetPad()
+	if n == 0 {
+		return v, nil
+	}
+
+	_, err = utils.ReadData(r.reader, n)
+	return v, err
 }
 
-func (r *cpioReceiver) readFile(name string, header *CPIOFileHeader) ([]byte, error) {
-	last := header.Size + int64(header.Pad)
-	buf := make([]byte, last)
-
-	var pn int64
-	var start int64
-	for start = 0; last > 0; start += pn {
-		pn = 8192
-		if last < pn {
-			pn = last
-		}
-		last -= pn
-
-		_, err := r.read("file: "+name, buf[start:start+pn], true)
-		if err != nil {
-			return nil, err
-		}
+func (r *cpioReceiver) saveCPIOFile(header *CPIOFileHeader, file string) error {
+	err := utils.DownloadFileWithSize(r.reader, header.Size, file)
+	if err != nil {
+		return err
 	}
 
-	if header.Pad > 0 {
-		return buf[:header.Size], nil
+	if n := header.GetPad(); n > 0 {
+		_, err := utils.ReadData(r.reader, n)
+
+		return err
 	}
 
-	return buf, nil
-}
-
-func (r *cpioReceiver) parseHeader(bs []byte) (CPIOFileHeader, error) {
-	n := len(bs)
-	if n < 110 || string(bs[:6]) != "070701" {
-		return CPIOFileHeader{}, fmt.Errorf("not cpio file")
-	}
-
-	substr := func(start, n int) string {
-		return string(bs[start : start+n])
-	}
-
-	hex := func(s string) int64 {
-		v, _ := strconv.ParseInt(s, 16, 0)
-		return v
-	}
-
-	size := hex(substr(54, 8))
-	pad := int(4-(size%4)) % 4
-	if size == 0xffffffff {
-		size = hex(substr(86, 8))
-		pad = int(4-(size%4)) % 4
-
-		size += (hex(substr(78, 8)) << 32)
-		if size < 0xffffffff {
-			return CPIOFileHeader{}, fmt.Errorf("invalid size")
-		}
-	}
-
-	namesize := hex(substr(94, 8))
-	if namesize > 8192 {
-		return CPIOFileHeader{}, fmt.Errorf("ridiculous long filename")
-	}
-
-	h := CPIOFileHeader{
-		Mode:     hex(substr(14, 8)),
-		Mtime:    hex(substr(46, 8)),
-		Namesize: int(namesize),
-		Size:     size,
-		Pad:      pad,
-	}
-
-	h.Namepad = (6 - (h.Namesize % 4)) % 4
-	h.Type = int(h.Mode >> 12 & 0xf)
-
-	return h, nil
+	return nil
 }

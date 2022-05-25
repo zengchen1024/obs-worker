@@ -11,10 +11,15 @@ type CPIOFileHeader struct {
 	Mtime    int64
 	Mode     int64
 	Size     int64
-	Type     int
 	Namesize int
-	Namepad  int
-	Pad      int
+}
+
+func (h *CPIOFileHeader) GetFileStreamSize() int64 {
+	return h.Size + int64(h.GetPad())
+}
+
+func (h *CPIOFileHeader) GetNameStreamSize() int {
+	return h.Namesize + h.getNamePad()
 }
 
 func (h *CPIOFileHeader) GetPad() int {

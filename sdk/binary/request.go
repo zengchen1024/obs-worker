@@ -91,7 +91,7 @@ func List(endpoint string, opts *ListOpts) (binaries BinaryVersionList, err erro
 			return err
 		}
 
-		b, err := utils.ReadData(r, "", int64(n))
+		b, err := utils.ReadData(r, n)
 		if err != nil {
 			return err
 		}
