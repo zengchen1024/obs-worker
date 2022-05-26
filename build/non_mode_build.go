@@ -165,6 +165,8 @@ func (b *nonModeBuid) setBuildInfoOut() {
 }
 
 func (b *nonModeBuid) fetchSources() error {
+	utils.LogInfo("start getting sources")
+
 	s, err := b.sources.getSource()
 	if err != nil {
 		return err
@@ -175,6 +177,8 @@ func (b *nonModeBuid) fetchSources() error {
 	needSSLCert, ignoreImage, _ := b.parseBuildFile()
 
 	if needSSLCert {
+		utils.LogInfo("start downloading sslcert")
+
 		if err := b.sources.downloadSSLCert(); err != nil {
 			return err
 		}
@@ -183,6 +187,8 @@ func (b *nonModeBuid) fetchSources() error {
 	if ignoreImage {
 		b.report.collectOrigins = true
 	}
+
+	utils.LogInfo("start getting binaries")
 
 	v, err := b.binaryLoader.getBinaries(!ignoreImage)
 	if err != nil {

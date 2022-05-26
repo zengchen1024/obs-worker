@@ -25,7 +25,7 @@ func (b *buildSources) getSource() (string, error) {
 		b.getSrcServer(), srcdir,
 	)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("download pkg source failed, err: %s", err.Error())
 	}
 
 	m := make(map[string]string)
@@ -121,14 +121,8 @@ func (b *buildSources) downloadPkgSource(project, pkg, srcmd5, endpoint, saveTo 
 }
 
 func (b *buildSources) downloadSSLCert() error {
-	v, err := sslcert.List(
+	return sslcert.List(
 		b.getSrcServer(), b.getBuildInfo().Project, true,
-	)
-	if err != nil || len(v) == 0 {
-		return err
-	}
-
-	return utils.WriteFile(
-		filepath.Join(b.getSrcdir(), "_projectcert.crt"), v,
+		filepath.Join(b.getSrcdir(), "_projectcert.crt"),
 	)
 }

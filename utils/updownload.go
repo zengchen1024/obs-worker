@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"io"
 	"os"
 )
@@ -24,12 +25,43 @@ func DownloadFileWithSize(r io.Reader, size int64, file string) error {
 
 	defer fo.Close()
 
-	lr := &limitedRead{size, r}
-	return transfer(lr, fo)
+	return limitedTransfer(r, size, fo)
 }
 
 func EmptyRead(r io.Reader, size int64) error {
 	return DownloadFileWithSize(r, size, os.DevNull)
+}
+
+func limitedTransfer(r io.Reader, size int64, w io.Writer) error {
+	read := func() ([]byte, error) {
+		if size == 0 {
+			return nil, nil
+		}
+
+		buf := make([]byte, 1<<13)
+
+		if size < int64(len(buf)) {
+			buf = buf[:size]
+		}
+
+		n, err := ReadTo(nil, r, buf)
+		if err != nil {
+			return nil, err
+		}
+		if n == 0 {
+			return nil, fmt.Errorf("oh no, left %d data to read", size)
+		}
+
+		size -= int64(n)
+
+		return buf[:n], nil
+	}
+
+	write := func(data []byte) error {
+		return Write(nil, w, data)
+	}
+
+	return TransferData(read, write)
 }
 
 func transfer(r io.Reader, w io.Writer) error {
@@ -49,25 +81,4 @@ func transfer(r io.Reader, w io.Writer) error {
 	}
 
 	return TransferData(read, write)
-}
-
-type limitedRead struct {
-	max int64
-	r   io.Reader
-}
-
-func (l *limitedRead) Read(buf []byte) (int, error) {
-	if l.max == 0 {
-		return 0, io.EOF
-	}
-
-	n, err := l.r.Read(buf)
-
-	l.max -= int64(n)
-
-	return n, err
-}
-
-func NewLimitedReader(max int64, r io.Reader) io.Reader {
-	return &limitedRead{max, r}
 }

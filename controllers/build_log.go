@@ -132,16 +132,27 @@ func (b BuildController) uploadLog(file string, start int64, end *int64, w http.
 }
 
 func upload(r io.Reader, total int64, w io.Writer) {
-	lr := utils.NewLimitedReader(total, r)
-
 	read := func() ([]byte, error) {
+		if total == 0 {
+			return nil, nil
+		}
+
 		n := 4096
 		buf := make([]byte, n+8)
 
-		n, err := utils.ReadTo(nil, lr, buf[6:n+6])
-		if err != nil || n == 0 {
+		if total < int64(n) {
+			n = int(total)
+		}
+
+		n, err := utils.ReadTo(nil, r, buf[6:n+6])
+		if err != nil {
 			return nil, err
 		}
+		if n == 0 {
+			return nil, fmt.Errorf("oh no, left %d data to read", total)
+		}
+
+		total -= int64(n)
 
 		copy(buf, fmt.Sprintf("%04X\r\n", n))
 		copy(buf[n+6:], []byte("\r\n"))
