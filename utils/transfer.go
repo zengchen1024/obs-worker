@@ -22,11 +22,10 @@ func (h *transferData) do(r TransferRead, w TransferWrite) error {
 	h.writeDone = make(chan struct{})
 	h.ch = make(chan []byte, 1)
 
-	wg := sync.WaitGroup{}
-
 	var rerr error
 	var werr error
 
+	wg := sync.WaitGroup{}
 	wg.Add(2)
 
 	go func() {
@@ -60,6 +59,7 @@ func (h *transferData) read(r TransferRead) error {
 		select {
 		case <-h.writeDone:
 			return nil
+
 		case h.ch <- buf:
 		}
 	}

@@ -37,9 +37,8 @@ func GenMd5OfFile(f string) (string, error) {
 
 func GenMd5OfByteStream(r io.Reader, size int64) (string, error) {
 	h := md5.New()
-	lr := &limitedRead{size, r}
 
-	if err := transfer(lr, h); err != nil {
+	if err := limitedTransfer(r, size, h); err != nil {
 		return "", err
 	}
 
@@ -85,6 +84,8 @@ func ReadData(r io.Reader, total int) ([]byte, error) {
 	}
 
 	if n != total {
+		LogInfo("ReadData got unexpect EOF, %d != %d", n, total)
+
 		return buf[:n], io.EOF
 	}
 
