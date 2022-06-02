@@ -98,6 +98,11 @@ func (b *buildPkg) kill() error {
 func (b *buildPkg) build(args []string) (int, error) {
 	utils.LogInfo("start obs-build")
 
+	utils.WriteFile(
+		filepath.Join(b.workDir, "obs-build"),
+		[]byte(strings.Join(args, "\n")),
+	)
+
 	out, err, code := utils.RunCmd(args...)
 
 	if err != nil {
