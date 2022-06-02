@@ -2,6 +2,7 @@ package worker
 
 import (
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/zengchen1024/obs-worker/build"
@@ -17,9 +18,10 @@ func GetBuildManager() *BuildManager {
 }
 
 type BuildManager struct {
-	cfg  *build.Config
-	w    worker.Worker
-	port int
+	cfg     *build.Config
+	w       worker.Worker
+	port    int
+	workDir string
 
 	lock  sync.RWMutex
 	state workerstate.WorkerState
@@ -150,6 +152,13 @@ func Init(cfg *build.Config, port int) error {
 	if err := b.getWorkerInfo(); err != nil {
 		return err
 	}
+
+	dir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	b.workDir = dir
 
 	b.sendIdleState()
 

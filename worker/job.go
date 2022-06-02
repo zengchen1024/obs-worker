@@ -67,7 +67,7 @@ func (b *BuildManager) createJob(registerServer string, j *Job) error {
 	}
 
 	v, _ := j.Marshal()
-	err := utils.WriteFile(filepath.Join(b.cfg.StateDir, "job"), v)
+	err := utils.WriteFile(filepath.Join(b.workDir, "job"), v)
 	if err != nil {
 		return err
 	}
